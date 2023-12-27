@@ -1,5 +1,5 @@
 import torch
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 from comfy.model_patcher import ModelPatcher
 
@@ -25,6 +25,8 @@ class DareModelMerger:
                 "middle": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "out": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "sparsity": ("FLOAT", {"default": 0.1, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "threshold_type": (["median", "quantile"], ),
+                "invert": (["No", "Yes"], ),
             }
         }
 
@@ -32,14 +34,17 @@ class DareModelMerger:
     FUNCTION = "merge"
     CATEGORY = "ddare/model_merging"
 
-    def apply_sparsification(self, base_param: torch.Tensor, target_param: torch.Tensor, sparsity_level: float, clear_cache : bool = False) -> torch.Tensor:
+    def apply_sparsification(self, base_param: torch.Tensor, target_param: torch.Tensor, sparsity: float,
+                             threshold_type : str, invert : str, clear_cache : bool = False, **kwargs) -> torch.Tensor:
         """
         Applies sparsification to a tensor based on the specified sparsity level, with chunking for large tensors.
 
         Args:
             base_param (torch.Tensor): The corresponding parameter from the base model.
             target_param (torch.Tensor): The corresponding parameter from the update model.
-            sparsity_level (float): The fraction of elements to set to zero.
+            sparsity (float): The fraction of elements to set to zero.
+            threshold_type (str): The type of threshold to use, either "median" or "quantile".
+            invert (str): Whether to invert the sparsification, i.e., keep the least significant changes.
             clear_cache (bool): Whether to clear the CUDA cache after each chunk. Default is False.
 
         Returns:
@@ -64,21 +69,25 @@ class DareModelMerger:
             chunk = absolute_delta[i:i + chunk_size]
             if chunk.numel() == 0:
                 continue
-            k = int(sparsity_level * chunk.numel())
+            k = int(sparsity * chunk.numel())
             if k > 0:
-                threshold = torch.quantile(chunk, sparsity_level)
+                threshold = torch.quantile(chunk, sparsity)
             else:
                 threshold = torch.tensor(0.0)
             thresholds.append(threshold)
 
         # Determine a global threshold
-        sorted_thresholds = sorted(thresholds)
-        index = int(sparsity_level * len(sorted_thresholds))
-        index = max(0, min(index, len(sorted_thresholds) - 1))
-        global_threshold = sorted_thresholds[index]
+        
+        if threshold_type == "median":
+            global_threshold = torch.median(torch.tensor(thresholds))
+        else:
+            sorted_thresholds = sorted(thresholds)
+            index = int(sparsity * len(sorted_thresholds))
+            index = max(0, min(index, len(sorted_thresholds) - 1))
+            global_threshold = sorted_thresholds[index]
 
         # Create a mask for values to keep (above the threshold)
-        mask = absolute_delta >= global_threshold
+        mask = absolute_delta >= global_threshold if invert == 'No' else absolute_delta < global_threshold
 
         # Apply the mask to the delta, replace other values with the base model's parameters
         sparsified_flat = torch.where(mask, base_param_flat, base_param_flat + delta_flat)
@@ -87,7 +96,20 @@ class DareModelMerger:
             torch.cuda.empty_cache()
         return sparsified_flat.view_as(base_param).to('cpu')
 
-    def merge(self, model1: ModelPatcher, model2: ModelPatcher, input : float, middle : float, out : float, sparsity : float, **kwargs) -> Tuple[ModelPatcher]:
+    def patcher(self, model: ModelPatcher, key : str) -> Optional[torch.Tensor]:
+        # This is slow, but seems to work
+        model_sd = model.model_state_dict()
+        if key not in model_sd:
+            print("could not patch. key doesn't exist in model:", key)
+            return None
+
+        weight : torch.Tensor = model_sd[key]
+
+        temp_weight = weight.to(torch.float32, copy=True)
+        out_weight = model.calculate_weight(model.patches[key], temp_weight, key).to(weight.dtype)
+        return out_weight
+
+    def merge(self, model1: ModelPatcher, model2: ModelPatcher, input : float, middle : float, out : float, **kwargs) -> Tuple[ModelPatcher]:
         """
         Merges two ModelPatcher instances based on the weighted consensus of their parameters and sparsity.
 
@@ -101,6 +123,7 @@ class DareModelMerger:
         """
         m = model1.clone()  # Clone model1 to keep its structure
         model1_sd = m.model_state_dict()  # State dict of model1
+        kp1 = model2.get_key_patches("diffusion_model.")  # Get the key patches from model1
         kp = model2.get_key_patches("diffusion_model.")  # Get the key patches from model2
 
         # Merge each parameter from model2 into model1
@@ -125,9 +148,28 @@ class DareModelMerger:
             # but I had so many memory issues that I'm being very careful
             a : torch.Tensor = model1_sd[k]
             b : torch.Tensor = kp[k][-1]
-            a = a.copy_(a)
-            b = b.copy_(b)
-            sparsified_delta = self.apply_sparsification(a, b, sparsity)
+
+            # Debugging
+            # our 'Tensor's might be a tuple sometimes if it's part of a chain.  This logic is very hacky and could be flawed.
+            # typer = lambda x: type(x) if not isinstance(x, tuple) else [typer(y) for y in x]
+            
+            if isinstance(a, tuple):
+                #print('chain', a[0], a[-1], len(a), typer(a))
+                a = self.patcher(model1, k)
+                if a is None:
+                    continue
+            else:
+                a = a.copy_(a)
+            
+            if isinstance(b, tuple):
+                #print('chain', b[0], b[-1], len(b), typer(b))
+                b = self.patcher(model2, k)
+                if b is None:
+                    continue
+            else:
+                b = b.copy_(b)
+
+            sparsified_delta = self.apply_sparsification(a, b, **kwargs)
             nv = (sparsified_delta,)
 
             del a, b
