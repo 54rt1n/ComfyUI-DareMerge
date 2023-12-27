@@ -175,8 +175,8 @@ class DareModelMerger:
             del a, b
             
             # Apply the sparsified delta as a patch
-            strength_model = 1.0 - ratio
-            strength_patch = ratio
+            strength_patch = 1.0 - ratio
+            strength_model = ratio
             m.add_patches({k: nv}, strength_patch, strength_model)
 
         return (m,)
