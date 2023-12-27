@@ -71,8 +71,11 @@ class DareModelMerger:
                 threshold = torch.tensor(0.0)
             thresholds.append(threshold)
 
-        # Determine a global threshold (e.g., median of chunk thresholds)
-        global_threshold = torch.median(torch.tensor(thresholds))
+        # Determine a global threshold
+        sorted_thresholds = sorted(thresholds)
+        index = int(sparsity_level * len(sorted_thresholds))
+        index = max(0, min(index, len(sorted_thresholds) - 1))
+        global_threshold = sorted_thresholds[index]
 
         # Create a mask for values to keep (above the threshold)
         mask = absolute_delta >= global_threshold
