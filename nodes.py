@@ -24,7 +24,8 @@ class DareModelMerger:
                 "input": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "middle": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "out": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "sparsity": ("FLOAT", {"default": 0.1, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "time": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "sparsity": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "threshold_type": (["median", "quantile"], ),
                 "invert": (["No", "Yes"], ),
             }
@@ -109,7 +110,7 @@ class DareModelMerger:
         out_weight = model.calculate_weight(model.patches[key], temp_weight, key).to(weight.dtype)
         return out_weight
 
-    def merge(self, model1: ModelPatcher, model2: ModelPatcher, input : float, middle : float, out : float, **kwargs) -> Tuple[ModelPatcher]:
+    def merge(self, model1: ModelPatcher, model2: ModelPatcher, input : float, middle : float, out : float, time : float, **kwargs) -> Tuple[ModelPatcher]:
         """
         Merges two ModelPatcher instances based on the weighted consensus of their parameters and sparsity.
 
@@ -138,11 +139,13 @@ class DareModelMerger:
                 ratio = input
             elif k_unet.startswith("middle"):
                 ratio = middle
-            elif k_unet.startswith("output"):
+            elif k_unet.startswith("out"):
                 ratio = out
+            elif k_unet.startswith("time"):
+                ratio = time
             else:
                 print(f"Unknown key: {k}, skipping.")
-                continue
+                ratio = 1.0
 
             # Apply sparsification by the delta, I don't know if all of this cuda stuff is necessary
             # but I had so many memory issues that I'm being very careful
