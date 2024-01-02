@@ -4,6 +4,8 @@ from typing import Dict, Tuple, Optional
 
 from comfy.model_patcher import ModelPatcher
 
+from .mergeutil import merge_tensors
+
 
 class DareModelMerger:
     """
@@ -34,6 +36,7 @@ class DareModelMerger:
                 "middle": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "out": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "time": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "method": (["lerp", "slerp", "gradient"], ),
                 "exclude_a": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "include_b": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "threshold_type": (["median", "quantile"], {"default": "median"}),
@@ -46,7 +49,7 @@ class DareModelMerger:
     CATEGORY = "ddare/dare"
 
     def merge(self, base_model: ModelPatcher, model_a: ModelPatcher, model_b: ModelPatcher, 
-              input: float, middle: float, out: float, time: float,
+              input: float, middle: float, out: float, time: float, method : str,
               clear_cache : bool = True,
               **kwargs) -> Tuple[ModelPatcher]:
         """
@@ -58,11 +61,14 @@ class DareModelMerger:
             input (float): The ratio (lambda) of the input layer to keep from model1.
             middle (float): The ratio (lambda) of the middle layers to keep from model1.
             out (float): The ratio (lambda) of the output layer to keep from model1.
+            method (str): The method to use for merging, either "lerp", "slerp", or "gradient".
             **kwargs: Additional arguments specifying the merge ratios for different layers and sparsity.
 
         Returns:
             Tuple[ModelPatcher]: A tuple containing the merged ModelPatcher instance.
         """
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         if clear_cache and torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -127,15 +133,15 @@ class DareModelMerger:
                 b = b.copy_(b)
 
             print(f"Processing Layer {k} with ratio {ratio}")
-            sparsified_delta = self.apply_sparsification(base, a, b, **kwargs)
-            nv = (sparsified_delta,)
+            sparsified_delta = self.apply_sparsification(base, a, b, device=device, **kwargs)
+            merged_layer = merge_tensors(method, a.to(device), sparsified_delta.to(device), 1 - ratio)
+
+            nv = (merged_layer.to('cpu'),)
 
             del base, a, b
             
             # Apply the sparsified delta as a patch
-            strength_patch = 1.0 - ratio
-            strength_model = ratio
-            m.add_patches({k: nv}, strength_patch, strength_model)
+            m.add_patches({k: nv}, 1, 0)
 
         if clear_cache and torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -200,12 +206,11 @@ class DareModelMerger:
         return mask
 
     def apply_sparsification(self, base_model_param: torch.Tensor, model_a_param: torch.Tensor, model_b_param: torch.Tensor,
-                             exclude_a: float, include_b: float, invert : str, drop_rate: float,
+                             exclude_a: float, include_b: float, invert : str, drop_rate: float, device : torch.device,
                              seed: Optional[int] = None, **kwargs) -> torch.Tensor:
         """
         Applies sparsification to a tensor based on the specified sparsity level.
         """
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         base_model_flat = base_model_param.view(-1).float().to(device)
         model_a_flat = model_a_param.view(-1).float().to(device)
         model_b_flat = model_b_param.view(-1).float().to(device)
@@ -229,4 +234,4 @@ class DareModelMerger:
         sparsified_flat = torch.where(mask, model_a_flat + delta_flat, model_a_flat)
         del mask, delta_flat, include_mask, exclude_mask, base_mask, model_a_flat, model_b_flat, base_model_flat
         
-        return sparsified_flat.view_as(base_model_param).to('cpu')
+        return sparsified_flat.view_as(base_model_param)

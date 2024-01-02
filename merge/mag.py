@@ -4,6 +4,7 @@ from typing import Dict, Tuple, Optional
 
 from comfy.model_patcher import ModelPatcher
 
+from .mergeutil import merge_tensors
 
 class MagnitudePruningModelMerger:
     """
@@ -21,12 +22,13 @@ class MagnitudePruningModelMerger:
         """
         return {
             "required": {
-                "model1": ("MODEL",),
-                "model2": ("MODEL",),
+                "model_a": ("MODEL",),
+                "model_b": ("MODEL",),
                 "input": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "middle": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "out": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "time": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "method": (["lerp", "slerp", "gradient"], ),
                 "sparsity": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "threshold_type": (["median", "quantile"], ),
                 "invert": (["No", "Yes"], ),
@@ -38,7 +40,8 @@ class MagnitudePruningModelMerger:
     CATEGORY = "ddare/magnitude_pruning"
 
     def apply_sparsification(self, base_param: torch.Tensor, target_param: torch.Tensor, sparsity: float,
-                             threshold_type : str, invert : str, clear_cache : bool = False, **kwargs) -> torch.Tensor:
+                             threshold_type : str, invert : str, device : torch.device, clear_cache : bool = False,
+                             **kwargs) -> torch.Tensor:
         """
         Applies sparsification to a tensor based on the specified sparsity level, with chunking for large tensors.
 
@@ -54,7 +57,6 @@ class MagnitudePruningModelMerger:
             torch.Tensor: The tensor with insignificant changes replaced by the base model's values.
         """
         # Ensure the delta and base_param are float tensors for quantile calculation, and on the right device
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         target_param = target_param.to(device)
         base_param = base_param.to(device)
         delta = target_param - base_param
@@ -97,7 +99,7 @@ class MagnitudePruningModelMerger:
         del mask, absolute_delta, delta_flat, base_param_flat, global_threshold, thresholds
         if clear_cache and torch.cuda.is_available():
             torch.cuda.empty_cache()
-        return sparsified_flat.view_as(base_param).to('cpu')
+        return sparsified_flat.view_as(base_param)
 
     def patcher(self, model: ModelPatcher, key : str) -> Optional[torch.Tensor]:
         # This is slow, but seems to work
@@ -112,28 +114,33 @@ class MagnitudePruningModelMerger:
         out_weight = model.calculate_weight(model.patches[key], temp_weight, key).to(weight.dtype)
         return out_weight
 
-    def merge(self, model1: ModelPatcher, model2: ModelPatcher, input : float, middle : float, out : float, time : float, **kwargs) -> Tuple[ModelPatcher]:
+    def merge(self, model_a: ModelPatcher, model_b: ModelPatcher,
+              input : float, middle : float, out : float, time : float, method : str,
+              **kwargs) -> Tuple[ModelPatcher]:
         """
         Merges two ModelPatcher instances based on the weighted consensus of their parameters and sparsity.
 
         Args:
-            model1 (ModelPatcher): The base model to be merged.
-            model2 (ModelPatcher): The model to merge into the base model.
-            input (float): The ratio (lambda) of the input layer to keep from model1.
-            middle (float): The ratio (lambda) of the middle layers to keep from model1.
-            out (float): The ratio (lambda) of the output layer to keep from model1.
+            model_a (ModelPatcher): The base model to be merged.
+            model_b (ModelPatcher): The model to merge into the base model.
+            input (float): The ratio (lambda) of the input layer to keep from model_a.
+            middle (float): The ratio (lambda) of the middle layers to keep from model_a.
+            out (float): The ratio (lambda) of the output layer to keep from model_a.
+            time (float): The ratio (lambda) of the time layers to keep from model_a.
+            method (str): The method to use for merging, either "lerp", "slerp", or "gradient".
             **kwargs: Additional arguments specifying the merge ratios for different layers and sparsity.
 
         Returns:
             Tuple[ModelPatcher]: A tuple containing the merged ModelPatcher instance.
         """
-        m = model1.clone()  # Clone model1 to keep its structure
-        model1_sd = m.model_state_dict()  # State dict of model1
-        kp = model2.get_key_patches("diffusion_model.")  # Get the key patches from model2
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        m = model_a.clone()  # Clone model_a to keep its structure
+        model_a_sd = m.model_state_dict()  # State dict of model_a
+        kp = model_b.get_key_patches("diffusion_model.")  # Get the key patches from model_b
 
-        # Merge each parameter from model2 into model1
+        # Merge each parameter from model_b into model_a
         for k in kp:
-            if k not in model1_sd:
+            if k not in model_a_sd:
                 continue
 
             k_unet = k[len("diffusion_model."):]
@@ -153,7 +160,7 @@ class MagnitudePruningModelMerger:
 
             # Apply sparsification by the delta, I don't know if all of this cuda stuff is necessary
             # but I had so many memory issues that I'm being very careful
-            a : torch.Tensor = model1_sd[k]
+            a : torch.Tensor = model_a_sd[k]
             b : torch.Tensor = kp[k][-1]
 
             # Debugging
@@ -162,7 +169,7 @@ class MagnitudePruningModelMerger:
             
             if isinstance(a, tuple):
                 #print('chain', a[0], a[-1], len(a), typer(a))
-                a = self.patcher(model1, k)
+                a = self.patcher(model_a, k)
                 if a is None:
                     continue
             else:
@@ -170,21 +177,21 @@ class MagnitudePruningModelMerger:
             
             if isinstance(b, tuple):
                 #print('chain', b[0], b[-1], len(b), typer(b))
-                b = self.patcher(model2, k)
+                b = self.patcher(model_b, k)
                 if b is None:
                     continue
             else:
                 b = b.copy_(b)
 
-            sparsified_delta = self.apply_sparsification(a, b, **kwargs)
-            nv = (sparsified_delta,)
+            sparsified_delta = self.apply_sparsification(a, b, device=device, **kwargs)
+            merged_layer = merge_tensors(method, a.to(device), sparsified_delta.to(device), 1 - ratio)
+
+            nv = (merged_layer.to('cpu'),)
 
             del a, b
             
             # Apply the sparsified delta as a patch
-            strength_patch = 1.0 - ratio
-            strength_model = ratio
-            m.add_patches({k: nv}, strength_patch, strength_model)
+            m.add_patches({k: nv}, 1, 0)
 
         return (m,)
 

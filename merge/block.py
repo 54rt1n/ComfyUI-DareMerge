@@ -53,6 +53,9 @@ class BlockModelMergerAdv:
         Returns:
             Tuple[ModelPatcher]: A tuple containing the merged ModelPatcher instance.
         """
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         m = model_a.clone()  # Clone model_a to keep its structure
         model_a_sd = m.model_state_dict()  # State dict of model_a
         kp = model_b.get_key_patches("diffusion_model.")  # Get the key patches from model_b
@@ -102,9 +105,9 @@ class BlockModelMergerAdv:
             else:
                 b = b.copy_(b)
 
-            merged_layer = merge_tensors(method, a, b, 1 - ratio)
+            merged_layer = merge_tensors(method, a.to(device), b.to(device), 1 - ratio)
 
-            nv = (merged_layer,)
+            nv = (merged_layer.to('cpu'),)
 
             del a, b
             
