@@ -1,4 +1,4 @@
-# daremerge.py
+# merge/dare.py
 import torch
 from typing import Dict, Tuple, Optional
 
@@ -43,7 +43,7 @@ class DareModelMerger:
 
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "merge"
-    CATEGORY = "ddare/model_merging"
+    CATEGORY = "ddare/dare"
 
     def merge(self, base_model: ModelPatcher, model_a: ModelPatcher, model_b: ModelPatcher, 
               input: float, middle: float, out: float, time: float,

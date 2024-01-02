@@ -1,4 +1,4 @@
-# magmerge.py
+# merge/mag.py
 import torch
 from typing import Dict, Tuple, Optional
 
@@ -35,7 +35,7 @@ class MagnitudePruningModelMerger:
 
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "merge"
-    CATEGORY = "ddare/model_merging"
+    CATEGORY = "ddare/magnitude_pruning"
 
     def apply_sparsification(self, base_param: torch.Tensor, target_param: torch.Tensor, sparsity: float,
                              threshold_type : str, invert : str, clear_cache : bool = False, **kwargs) -> torch.Tensor:
@@ -129,7 +129,6 @@ class MagnitudePruningModelMerger:
         """
         m = model1.clone()  # Clone model1 to keep its structure
         model1_sd = m.model_state_dict()  # State dict of model1
-        kp1 = model2.get_key_patches("diffusion_model.")  # Get the key patches from model1
         kp = model2.get_key_patches("diffusion_model.")  # Get the key patches from model2
 
         # Merge each parameter from model2 into model1

@@ -8,7 +8,8 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM),
 |category|node name|input type|output type|desc.|
 | --- | --- | --- | --- | --- |
 |merge|DareModelMerger|`MODEL`, `MODEL`, `MODEL`|`MODEL`|Performs a DARE block merge|
-|merge|MagnitudePruningModelMerger|`MODEL`, `MODEL`|`MODEL`|Performs a MP block merge|
+|merge|MagnitudeModelMerger|`MODEL`, `MODEL`|`MODEL`|Performs a MP block merge|
+|merge|BlockModelMergerAdv|`MODEL`, `MODEL`|`MODEL`|Performs a block merge with a custom merge type|
 
 * In general, one means keep first model, zero means keep second model
 * For Dare, we use the base model to determine which values to protect or include.
