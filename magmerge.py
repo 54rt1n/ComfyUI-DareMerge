@@ -1,12 +1,14 @@
+# nodes.py
 import torch
 from typing import Dict, Tuple, Optional
 
 from comfy.model_patcher import ModelPatcher
 
-class DareModelMerger:
+
+class MagnitudePruningModelMerger:
     """
     A class to merge two diffusion U-Net models using calculated deltas, sparsification,
-    and a weighted consensus method.
+    and a weighted consensus method.  This is the Magnitude Pruning method.
     """
 
     @classmethod
@@ -117,6 +119,9 @@ class DareModelMerger:
         Args:
             model1 (ModelPatcher): The base model to be merged.
             model2 (ModelPatcher): The model to merge into the base model.
+            input (float): The ratio (lambda) of the input layer to keep from model1.
+            middle (float): The ratio (lambda) of the middle layers to keep from model1.
+            out (float): The ratio (lambda) of the output layer to keep from model1.
             **kwargs: Additional arguments specifying the merge ratios for different layers and sparsity.
 
         Returns:
