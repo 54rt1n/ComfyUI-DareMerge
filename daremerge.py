@@ -46,7 +46,9 @@ class DareModelMerger:
     CATEGORY = "ddare/model_merging"
 
     def merge(self, base_model: ModelPatcher, model_a: ModelPatcher, model_b: ModelPatcher, 
-              input: float, middle: float, out: float, time: float, **kwargs) -> Tuple[ModelPatcher]:
+              input: float, middle: float, out: float, time: float,
+              clear_cache : bool = True,
+              **kwargs) -> Tuple[ModelPatcher]:
         """
         Merges two ModelPatcher instances based on the weighted consensus of their parameters and sparsity.
 
@@ -61,6 +63,10 @@ class DareModelMerger:
         Returns:
             Tuple[ModelPatcher]: A tuple containing the merged ModelPatcher instance.
         """
+
+        if clear_cache and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         m = model_a.clone()  # Clone model1 to keep its structure
         model_a_sd = m.model_state_dict()  # State dict of model1
         model_base_sd = base_model.model_state_dict()  # State dict of base model
@@ -131,6 +137,9 @@ class DareModelMerger:
             strength_model = ratio
             m.add_patches({k: nv}, strength_patch, strength_model)
 
+        if clear_cache and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         return (m,)
 
     def patcher(self, model: ModelPatcher, key : str) -> Optional[torch.Tensor]:
@@ -194,11 +203,12 @@ class DareModelMerger:
                              exclude_a: float, include_b: float,
                              invert : str, drop_rate: float,
                              seed: Optional[int] = None,
-                             clear_cache : bool = False, **kwargs) -> torch.Tensor:
+                             clear_cache : bool = False,
+                             **kwargs) -> torch.Tensor:
         """
         Applies sparsification to a tensor based on the specified sparsity level.
         """
-        device = base_model_param.device
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         base_model_flat = base_model_param.view(-1).float().to(device)
         model_a_flat = model_a_param.view(-1).float().to(device)
         model_b_flat = model_b_param.view(-1).float().to(device)
@@ -221,8 +231,5 @@ class DareModelMerger:
 
         sparsified_flat = torch.where(mask, model_a_flat + delta_flat, model_a_flat)
         del mask, delta_flat, include_mask, exclude_mask, base_mask, model_a_flat, model_b_flat, base_model_flat
-        
-        if clear_cache and torch.cuda.is_available():
-            torch.cuda.empty_cache()
         
         return sparsified_flat.view_as(base_model_param).to('cpu')
