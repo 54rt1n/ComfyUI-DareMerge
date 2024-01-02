@@ -1,4 +1,4 @@
-# nodes.py
+# daremerge.py
 import torch
 from typing import Dict, Tuple, Optional
 
@@ -200,11 +200,8 @@ class DareModelMerger:
         return mask
 
     def apply_sparsification(self, base_model_param: torch.Tensor, model_a_param: torch.Tensor, model_b_param: torch.Tensor,
-                             exclude_a: float, include_b: float,
-                             invert : str, drop_rate: float,
-                             seed: Optional[int] = None,
-                             clear_cache : bool = False,
-                             **kwargs) -> torch.Tensor:
+                             exclude_a: float, include_b: float, invert : str, drop_rate: float,
+                             seed: Optional[int] = None, **kwargs) -> torch.Tensor:
         """
         Applies sparsification to a tensor based on the specified sparsity level.
         """

@@ -1,4 +1,4 @@
-# nodes.py
+# magmerge.py
 import torch
 from typing import Dict, Tuple, Optional
 
