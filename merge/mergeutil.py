@@ -146,6 +146,7 @@ def merge_tensors_cyclic(v0: torch.Tensor, v1: torch.Tensor, t: float) -> torch.
 
 # Model 1 > Model 2 > Model 1, with t defining the peak of the gradient along the tensor's width
 def merge_tensors_gradient(v0: torch.Tensor, v1: torch.Tensor, t: float) -> torch.Tensor:
+    device = v0.device
     if v0.dim() == 2:
         total_length = v0.shape[1]
         peak = int(total_length * (1 - t))
@@ -162,7 +163,7 @@ def merge_tensors_gradient(v0: torch.Tensor, v1: torch.Tensor, t: float) -> torc
         v0_ratios = 1 - blend_ratios
 
         # Vectorized blending of the tensors
-        result = (v1 * blend_ratios.unsqueeze(0)) + (v0 * v0_ratios.unsqueeze(0))
+        result = (v1 * blend_ratios.unsqueeze(0).to(device)) + (v0 * v0_ratios.unsqueeze(0).to(device))
 
         return result
     else:
