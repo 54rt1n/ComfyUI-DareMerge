@@ -26,8 +26,10 @@ class DareModelMerger:
             Dict[str, tuple]: A dictionary specifying the required model types and parameters.
         """
         return {
-            "required": {
+            "optional": {
                 "base_model": ("MODEL",),
+            },
+            "required": {
                 "model_a": ("MODEL",),
                 "model_b": ("MODEL",),
                 "drop_rate": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01}),
@@ -36,7 +38,7 @@ class DareModelMerger:
                 "middle": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "out": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "time": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "method": (["lerp", "slerp", "gradient"], ),
+                "method": (["comfy", "lerp", "slerp", "gradient"], ),
                 "exclude_a": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "include_b": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "threshold_type": (["median", "quantile"], {"default": "median"}),
@@ -48,9 +50,10 @@ class DareModelMerger:
     FUNCTION = "merge"
     CATEGORY = "ddare/dare"
 
-    def merge(self, base_model: ModelPatcher, model_a: ModelPatcher, model_b: ModelPatcher, 
+    def merge(self, model_a: ModelPatcher, model_b: ModelPatcher, 
               input: float, middle: float, out: float, time: float, method : str,
-              clear_cache : bool = True,
+              seed : Optional[int] = None, clear_cache : bool = True,
+              base_model: Optional[ModelPatcher] = None,
               **kwargs) -> Tuple[ModelPatcher]:
         """
         Merges two ModelPatcher instances based on the weighted consensus of their parameters and sparsity.
@@ -68,6 +71,9 @@ class DareModelMerger:
             Tuple[ModelPatcher]: A tuple containing the merged ModelPatcher instance.
         """
 
+        if seed is not None:
+            torch.manual_seed(seed)
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         if clear_cache and torch.cuda.is_available():
@@ -75,12 +81,16 @@ class DareModelMerger:
 
         m = model_a.clone()  # Clone model1 to keep its structure
         model_a_sd = m.model_state_dict()  # State dict of model1
-        model_base_sd = base_model.model_state_dict()  # State dict of base model
+        if base_model is not None:
+            model_base_sd = base_model.model_state_dict()  # State dict of base model
+        else:
+            model_base_sd = None
         kp = model_b.get_key_patches("diffusion_model.")  # Get the key patches from model2
 
         # Merge each parameter from model2 into model1
         for k in kp:
             if k not in model_a_sd:
+                print("could not patch. key doesn't exist in model:", k)
                 continue
 
             k_unet = k[len("diffusion_model."):]
@@ -96,11 +106,11 @@ class DareModelMerger:
                 ratio = time
             else:
                 print(f"Unknown key: {k}, skipping.")
-                ratio = 1.0
+                continue
 
             # Apply sparsification by the delta, I don't know if all of this cuda stuff is necessary
             # but I had so many memory issues that I'm being very careful
-            base : torch.Tensor = model_base_sd[k]
+            base : torch.Tensor = model_base_sd[k] if model_base_sd is not None else None
             a : torch.Tensor = model_a_sd[k]
             b : torch.Tensor = kp[k][-1]
 
@@ -113,7 +123,7 @@ class DareModelMerger:
                 base = self.patcher(base_model, k)
                 if base is None:
                     continue
-            else:
+            elif base is not None:
                 base = base.copy_(base)
             
             if isinstance(a, tuple):
@@ -132,16 +142,25 @@ class DareModelMerger:
             else:
                 b = b.copy_(b)
 
-            print(f"Processing Layer {k} with ratio {ratio}")
+            #print(f"Processing Layer {k} with ratio {ratio}")
             sparsified_delta = self.apply_sparsification(base, a, b, device=device, **kwargs)
-            merged_layer = merge_tensors(method, a.to(device), sparsified_delta.to(device), 1 - ratio)
+            if method == "comfy":
+                merged_layer = sparsified_delta
 
-            nv = (merged_layer.to('cpu'),)
+                strength_patch = 1.0 - ratio
+                strength_model = ratio
+            else:
+                merged_layer = merge_tensors(method, a.to(device), sparsified_delta.to(device), 1 - ratio)
+
+                strength_model = 0
+                strength_patch = 1.0
 
             del base, a, b
             
             # Apply the sparsified delta as a patch
-            m.add_patches({k: nv}, 1, 0)
+            nv = (merged_layer.to('cpu'),)
+
+            m.add_patches({k: nv}, strength_patch, strength_model)
 
         if clear_cache and torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -189,49 +208,61 @@ class DareModelMerger:
         
         Args:
             delta_param (torch.Tensor): The delta parameter tensor.
-            sparsity (float): The fraction of elements to set to zero.
+            sparsity (float): The fraction of elements to set to zero.  0 = include all, 1 = exclude all.
             invert (str): Whether to invert the sparsification, i.e., keep the least significant changes.
             
         Returns:
             torch.Tensor: The mask of the delta parameter.
         """
 
+        invertion = 1 if invert == 'No' else 0
+        if sparsity == 1.0:
+            return torch.ones_like(delta_param) == invertion
+        elif sparsity == 0.0:
+            return torch.zeros_like(delta_param) == invertion
+
         absolute_delta = torch.abs(delta_param)
 
         # We can easily overrun memory with large tensors, so we chunk the tensor
         delta_threshold = self.process_in_chunks(tensor=absolute_delta, sparsity=sparsity, **kwargs)
+        print(f"Delta threshold: {delta_threshold} Mask: {absolute_delta.sum()} / {absolute_delta.numel()} invert: {invert} sparsity: {sparsity}")
 
         # Create a mask for values to keep or preserve (above the threshold)
         mask = absolute_delta >= delta_threshold if invert == 'No' else absolute_delta < delta_threshold
         return mask
 
-    def apply_sparsification(self, base_model_param: torch.Tensor, model_a_param: torch.Tensor, model_b_param: torch.Tensor,
-                             exclude_a: float, include_b: float, invert : str, drop_rate: float, device : torch.device,
-                             seed: Optional[int] = None, **kwargs) -> torch.Tensor:
+    def apply_sparsification(self, base_model_param: Optional[torch.Tensor], model_a_param: torch.Tensor, model_b_param: torch.Tensor,
+                             exclude_a: float, include_b: float, invert : str, drop_rate: float, device : torch.device, **kwargs) -> torch.Tensor:
         """
         Applies sparsification to a tensor based on the specified sparsity level.
         """
-        base_model_flat = base_model_param.view(-1).float().to(device)
+
         model_a_flat = model_a_param.view(-1).float().to(device)
         model_b_flat = model_b_param.view(-1).float().to(device)
-        
-        include_mask = self.get_threshold_mask(model_b_flat - base_model_flat, 1 - include_b, invert, **kwargs)
-        exclude_mask = self.get_threshold_mask(model_a_flat - base_model_flat, 1 - exclude_a, invert, **kwargs)
-        
-        base_mask = include_mask & (~exclude_mask)
-        print(f"base nonzero count: {torch.count_nonzero(base_mask)} include nonzero count: {torch.count_nonzero(include_mask)} exclude nonzero count: {torch.count_nonzero(exclude_mask)}")
+        delta_flat = model_b_flat - model_a_flat
 
-        delta_flat = model_a_flat - model_b_flat
-        
-        if seed is not None:
-            torch.manual_seed(seed)
+        if base_model_param is not None:
+            base_model_flat = base_model_param.view(-1).float().to(device)
+            delta_a_flat = model_a_flat - base_model_flat
+            delta_b_flat = model_b_flat - base_model_flat
+            
+            include_mask = self.get_threshold_mask(delta_b_flat, include_b, invert, **kwargs)
+            exclude_mask = self.get_threshold_mask(delta_a_flat, exclude_a, invert, **kwargs)
+            del base_model_flat, delta_a_flat, delta_b_flat
+        else:
+            include_mask = torch.ones_like(model_a_flat).bool()
+            exclude_mask = torch.ones_like(model_a_flat).bool()
+            
+        base_mask = include_mask & (~exclude_mask)
         
         dare_mask = torch.bernoulli(torch.full(delta_flat.shape, 1 - drop_rate, device=device)).bool()
-        sparsified_flat = delta_flat / (1 - drop_rate)  # Rescale the remaining deltas
+        # The paper says we should rescale, but it yields terrible results
+        # delta_flat = delta_flat / (1 - drop_rate)  # Rescale the remaining deltas
         
         mask = dare_mask & base_mask
+        print(f"mask nonzero count: {torch.count_nonzero(mask)} dare nonzero count: {torch.count_nonzero(dare_mask)} base nonzero count: {torch.count_nonzero(base_mask)} include nonzero count: {torch.count_nonzero(include_mask)} exclude nonzero count: {torch.count_nonzero(exclude_mask)}")
 
         sparsified_flat = torch.where(mask, model_a_flat + delta_flat, model_a_flat)
-        del mask, delta_flat, include_mask, exclude_mask, base_mask, model_a_flat, model_b_flat, base_model_flat
+        del mask, delta_flat, include_mask, exclude_mask, base_mask, model_a_flat, model_b_flat
         
-        return sparsified_flat.view_as(base_model_param)
+        return sparsified_flat.view_as(model_a_param)

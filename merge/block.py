@@ -63,6 +63,7 @@ class BlockModelMergerAdv:
         # Merge each parameter from model_b into model_a
         for k in kp:
             if k not in model_a_sd:
+                print("could not patch. key doesn't exist in model:", k)
                 continue
 
             k_unet = k[len("diffusion_model."):]
@@ -78,7 +79,7 @@ class BlockModelMergerAdv:
                 ratio = time
             else:
                 print(f"Unknown key: {k}, skipping.")
-                ratio = 1.0
+                continue
 
             # Apply sparsification by the delta, I don't know if all of this cuda stuff is necessary
             # but I had so many memory issues that I'm being very careful
