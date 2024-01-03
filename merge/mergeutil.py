@@ -1,7 +1,9 @@
 # merge/tensormerge.py
 # Credit to https://github.com/Gryphe/MergeMonster
 
+from comfy.model_patcher import ModelPatcher
 import torch
+from typing import Optional
 
 def merge_tensors(method: str, v0: torch.Tensor, v1: torch.Tensor, t: float) -> torch.Tensor:
     if method == "lerp":
@@ -206,3 +208,16 @@ def merge_header_tensors(model1, model2, method, v0, v1, t) -> torch.Tensor:
         v1 = v1[:model1size]
 
     return merge_tensors_lerp(v0, v1, t)
+
+def patcher(model: ModelPatcher, key : str) -> Optional[torch.Tensor]:
+    # This is slow, but seems to work
+    model_sd = model.model_state_dict()
+    if key not in model_sd:
+        print("could not patch. key doesn't exist in model:", key)
+        return None
+
+    weight : torch.Tensor = model_sd[key]
+
+    temp_weight = weight.to(torch.float32, copy=True)
+    out_weight = model.calculate_weight(model.patches[key], temp_weight, key).to(weight.dtype)
+    return out_weight
