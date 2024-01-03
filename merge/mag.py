@@ -28,8 +28,8 @@ class MagnitudePruningModelMerger:
                 "middle": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "out": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "time": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "method": (["lerp", "slerp", "gradient"], ),
-                "sparsity": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "method": (["comfy", "lerp", "slerp", "gradient"], ),
+                "density": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "threshold_type": (["median", "quantile"], ),
                 "invert": (["No", "Yes"], ),
             }
@@ -140,7 +140,7 @@ class MagnitudePruningModelMerger:
 
         return (m,)
 
-    def apply_sparsification(self, base_param: torch.Tensor, target_param: torch.Tensor, sparsity: float,
+    def apply_sparsification(self, base_param: torch.Tensor, target_param: torch.Tensor, density: float,
                              threshold_type : str, invert : str, device : torch.device,
                              **kwargs) -> torch.Tensor:
         """
@@ -149,7 +149,7 @@ class MagnitudePruningModelMerger:
         Args:
             base_param (torch.Tensor): The corresponding parameter from the base model.
             target_param (torch.Tensor): The corresponding parameter from the update model.
-            sparsity (float): The fraction of elements to set to zero.
+            density (float): The fraction of elements to keep from the second model.  1 is keep all.
             threshold_type (str): The type of threshold to use, either "median" or "quantile".
             invert (str): Whether to invert the sparsification, i.e., keep the least significant changes.
 
@@ -174,9 +174,9 @@ class MagnitudePruningModelMerger:
             chunk = absolute_delta[i:i + chunk_size]
             if chunk.numel() == 0:
                 continue
-            k = int(sparsity * chunk.numel())
+            k = int(density * chunk.numel())
             if k > 0:
-                threshold = torch.quantile(chunk, sparsity)
+                threshold = torch.quantile(chunk, density)
             else:
                 threshold = torch.tensor(0.0)
             thresholds.append(threshold)
@@ -187,13 +187,12 @@ class MagnitudePruningModelMerger:
             global_threshold = torch.median(torch.tensor(thresholds))
         else:
             sorted_thresholds = sorted(thresholds)
-            index = int(sparsity * len(sorted_thresholds))
+            index = int(density * len(sorted_thresholds))
             index = max(0, min(index, len(sorted_thresholds) - 1))
             global_threshold = sorted_thresholds[index]
 
         # Create a mask for values to keep (above the threshold)
         mask = absolute_delta >= global_threshold if invert == 'No' else absolute_delta < global_threshold
-        print(f"Global threshold: {global_threshold} Mask: {mask.abs().sum()} / {mask.numel()}")
 
         # Apply the mask to the delta, replace other values with the base model's parameters
         sparsified_flat = torch.where(mask, base_param_flat, base_param_flat + delta_flat)

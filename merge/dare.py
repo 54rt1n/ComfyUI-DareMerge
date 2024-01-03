@@ -192,7 +192,7 @@ class DareModelMerger:
             del base_model_flat, delta_a_flat, delta_b_flat
         else:
             include_mask = torch.ones_like(model_a_flat).bool()
-            exclude_mask = torch.ones_like(model_a_flat).bool()
+            exclude_mask = torch.zeros_like(model_a_flat).bool()
             
         base_mask = include_mask & (~exclude_mask)
         
@@ -201,7 +201,7 @@ class DareModelMerger:
         # delta_flat = delta_flat / (1 - drop_rate)  # Rescale the remaining deltas
         
         mask = dare_mask & base_mask
-        print(f"mask nonzero count: {torch.count_nonzero(mask)} dare nonzero count: {torch.count_nonzero(dare_mask)} base nonzero count: {torch.count_nonzero(base_mask)} include nonzero count: {torch.count_nonzero(include_mask)} exclude nonzero count: {torch.count_nonzero(exclude_mask)}")
+        # print(f"mask nonzero count: {torch.count_nonzero(mask)} dare nonzero count: {torch.count_nonzero(dare_mask)} base nonzero count: {torch.count_nonzero(base_mask)} include nonzero count: {torch.count_nonzero(include_mask)} exclude nonzero count: {torch.count_nonzero(exclude_mask)}")
 
         sparsified_flat = torch.where(mask, model_a_flat + delta_flat, model_a_flat)
         del mask, delta_flat, include_mask, exclude_mask, base_mask, model_a_flat, model_b_flat
