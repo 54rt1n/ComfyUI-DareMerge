@@ -207,6 +207,7 @@ class DareModelMerger:
         del mask, delta_flat, include_mask, exclude_mask, base_mask, model_a_flat, model_b_flat
         
         return sparsified_flat.view_as(model_a_param)
+
     def process_in_chunks(self, tensor: torch.Tensor, sparsity: float, threshold_type : str, **kwargs) -> torch.Tensor:
         """
         Processes the tensor in chunks and calculates the quantile thresholds for each chunk.
