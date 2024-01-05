@@ -1,5 +1,5 @@
 # ComfyUI-DareMerge
-Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM), sort of.
+Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM), sort of.  Not quite TIES yet, but getting there.
 
 # Node List
 
