@@ -41,6 +41,7 @@ class DareModelMerger:
                 "include_b": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "threshold_type": (["median", "quantile"], {"default": "median"}),
                 "invert": (["No", "Yes"], {"default": "No"}),
+                "iterations": ("INT", {"default": 1, "min": 1, "max": 100, "step": 1}),
             },
             "optional": {
                 "base_model": ("MODEL",),
@@ -54,7 +55,7 @@ class DareModelMerger:
     def merge(self, model_a: ModelPatcher, model_b: ModelPatcher, 
               input: float, middle: float, out: float, time: float, method : str,
               seed : Optional[int] = None, clear_cache : bool = True,
-              base_model: Optional[ModelPatcher] = None,
+              base_model: Optional[ModelPatcher] = None, iterations : int = 1,
               **kwargs) -> Tuple[ModelPatcher]:
         """
         Merges two ModelPatcher instances based on the weighted consensus of their parameters and sparsity.
@@ -70,6 +71,7 @@ class DareModelMerger:
             seed (int): The random seed to use for the merge.
             clear_cache (bool): Whether to clear the CUDA cache after each chunk. Default is False.
             base_model (ModelPatcher): The base model to use for calculating the deltas.  Optional.
+            iterations (int): The number of iterations to perform the merge.  Default is 1.
             **kwargs: Additional arguments specifying the merge ratios for different layers and sparsity.
 
         Returns:
@@ -149,23 +151,26 @@ class DareModelMerger:
             else:
                 b = b.copy_(b)
 
-            sparsified_delta = self.apply_sparsification(base, a, b, device=device, **kwargs)
+            merged_a = a
 
-            if method == "comfy":
-                merged_layer = sparsified_delta
+            for i in range(iterations):
+                sparsified_delta = self.apply_sparsification(base, merged_a, b, device=device, **kwargs)
 
-                strength_patch = 1.0 - ratio
-                strength_model = ratio
-            else:
-                merged_layer = merge_tensors(method, a.to(device), sparsified_delta.to(device), 1 - ratio)
+                if method == "comfy":
+                    merged_a = sparsified_delta
 
-                strength_model = 0
-                strength_patch = 1.0
+                    strength_patch = 1.0 - ratio
+                    strength_model = ratio
+                else:
+                    merged_a = merge_tensors(method, merged_a.to(device), sparsified_delta.to(device), 1 - ratio)
+
+                    strength_model = 0
+                    strength_patch = 1.0
 
             del base, a, b
             
             # Apply the sparsified delta as a patch
-            nv = (merged_layer.to('cpu'),)
+            nv = (merged_a.to('cpu'),)
 
             m.add_patches({k: nv}, strength_patch, strength_model)
 
