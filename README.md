@@ -1,5 +1,5 @@
 # ComfyUI-DareMerge
-Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM), sort of.  Not quite TIES yet, but getting there.
+Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM), sort of.  Now with TIES.
 
 # Node List
 
@@ -12,7 +12,8 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM),
 |merge|BlockModelMergerAdv|`MODEL`, `MODEL`|`MODEL`|Performs a block merge with a custom merge type|
 
 * In general, one means keep first model, zero means keep second model
-* For Dare, we use the base model to determine which values to protect or include.  It is optional, and if not provided will ignore exclude_a, include_b, threshold_type, and invert.
+* For DARE, we use the base model to determine which values to protect or include.  It is optional, and if not provided will ignore exclude_a, include_b, threshold_type, and invert.
+* For TIES, we can use the sum of the delta ties (as in the paper), or the count, or off to disable.
 * Larger density means to include more of the second model
 * Larger exclude_a preserves more of the first model
 * Larger include_b allows more of the second model

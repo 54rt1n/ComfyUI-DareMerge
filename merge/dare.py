@@ -1,7 +1,7 @@
 # merge/dare.py
 from comfy.model_patcher import ModelPatcher
 import torch
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Literal
 
 from .mergeutil import merge_tensors, patcher
 
@@ -29,6 +29,8 @@ class DareModelMerger:
                 "model_a": ("MODEL",),
                 "model_b": ("MODEL",),
                 "drop_rate": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "ties": (["sum", "count", "off"], {"default": "sum"}),
+                "rescale": (["off", "on"], {"default": "off"}),
                 "seed": ("INT", {"default": 42}),
                 "input": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "middle": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
@@ -173,7 +175,8 @@ class DareModelMerger:
         return (m,)
 
     def apply_sparsification(self, base_model_param: Optional[torch.Tensor], model_a_param: torch.Tensor, model_b_param: torch.Tensor,
-                             exclude_a: float, include_b: float, invert : str, drop_rate: float, device : torch.device, **kwargs) -> torch.Tensor:
+                             exclude_a: float, include_b: float, invert : str, drop_rate: float, ties : str, rescale : str,
+                             device : torch.device, **kwargs) -> torch.Tensor:
         """
         Applies sparsification to a tensor based on the specified sparsity level.
         """
@@ -189,24 +192,59 @@ class DareModelMerger:
             
             include_mask = self.get_threshold_mask(delta_b_flat, include_b, invert, **kwargs)
             exclude_mask = self.get_threshold_mask(delta_a_flat, exclude_a, invert, **kwargs)
-            del base_model_flat, delta_a_flat, delta_b_flat
+            base_mask = include_mask & (~exclude_mask)
+            del base_model_flat, delta_a_flat, delta_b_flat, include_mask, exclude_mask
         else:
             include_mask = torch.ones_like(model_a_flat).bool()
             exclude_mask = torch.zeros_like(model_a_flat).bool()
-            
-        base_mask = include_mask & (~exclude_mask)
+            base_mask = include_mask & (~exclude_mask)
+            del include_mask, exclude_mask
+
+        if ties != "off":
+            ties_mask = self.get_ties_mask(delta_flat, ties)
+            base_mask = base_mask & ties_mask
+            del ties_mask
         
         dare_mask = torch.bernoulli(torch.full(delta_flat.shape, 1 - drop_rate, device=device)).bool()
-        # The paper says we should rescale, but it yields terrible results
-        # delta_flat = delta_flat / (1 - drop_rate)  # Rescale the remaining deltas
+        # The paper says we should rescale, but it yields terrible results for SD
+        if rescale == "on":
+            # Rescale the remaining deltas
+            delta_flat = delta_flat / (1 - drop_rate)
         
-        mask = dare_mask & base_mask
+        final_mask = dare_mask & base_mask
         # print(f"mask nonzero count: {torch.count_nonzero(mask)} dare nonzero count: {torch.count_nonzero(dare_mask)} base nonzero count: {torch.count_nonzero(base_mask)} include nonzero count: {torch.count_nonzero(include_mask)} exclude nonzero count: {torch.count_nonzero(exclude_mask)}")
 
-        sparsified_flat = torch.where(mask, model_a_flat + delta_flat, model_a_flat)
-        del mask, delta_flat, include_mask, exclude_mask, base_mask, model_a_flat, model_b_flat
+        sparsified_flat = torch.where(final_mask, model_a_flat + delta_flat, model_a_flat)
+        del final_mask, delta_flat, base_mask, model_a_flat, model_b_flat, dare_mask
         
         return sparsified_flat.view_as(model_a_param)
+
+    def get_ties_mask(self, delta: torch.Tensor, method: Literal["sum", "count"] = "sum", mask_dtype: Optional[torch.dtype] = None, **kwargs) -> torch.Tensor:
+        """
+            TIES-merging https://arxiv.org/abs/2306.01708 uses sign agreement, protecting from
+            major perturbations in the opposite direction of the base model
+        
+            Returns a mask determining which delta vectors should be merged
+            into the final model.
+
+            For the methodology described in the paper use 'sum'. For a
+            simpler naive count of signs, use 'count'.
+        """
+        if mask_dtype is None:
+            mask_dtype = delta.dtype
+
+        sign = delta.sign().to(mask_dtype)
+
+        if method == "sum":
+            sign_weight = (sign * delta.abs()).sum(dim=0)
+            majority_sign = (sign_weight >= 0).to(mask_dtype) * 2 - 1
+            del sign_weight
+        elif method == "count":
+            majority_sign = (sign.sum(dim=0) >= 0).to(mask_dtype) * 2 - 1
+        else:
+            raise RuntimeError(f'Unimplemented mask method "{method}"')
+
+        return sign == majority_sign
 
     def process_in_chunks(self, tensor: torch.Tensor, sparsity: float, threshold_type : str, **kwargs) -> torch.Tensor:
         """
