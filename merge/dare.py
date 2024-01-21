@@ -81,7 +81,7 @@ class DareModelMerger:
         if seed is not None:
             torch.manual_seed(seed)
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         
         if clear_cache and torch.cuda.is_available():
             torch.cuda.empty_cache()
