@@ -174,14 +174,14 @@ class NormalizeUnet:
                     out_w_a : torch.Tensor = model_a_sd[out_w].to(device)
                     out_w_b : torch.Tensor = model_b_sd[out_w].to(device)
                     out_b_a : torch.Tensor = model_a_sd[out_b].to(device)
-                    scale_a = self._calculate_scaling_factor(q_a, q_b).to(device)
+                    scale_a = relative_norm(q_a, q_b).to(device)
                     # allocate q, k, v, out_w, out_b
                     nq = torch.empty_like(q_a, device=device)
                     nq = q_a.to(device) * scale_a
                     nk = torch.empty_like(k_a, device=device)
                     nk = k_a.to(device) / scale_a
                     #v_a = v_a.copy_(v_a * scale).to("cpu")
-                    scale_o = self._calculate_scaling_factor(out_w_a, out_w_b)
+                    scale_o = relative_norm(out_w_a, out_w_b)
                     nout_w = torch.empty_like(out_w_a, device=device)
                     nout_w = out_w_a.to(device) * scale_o
                     nout_b = torch.empty_like(out_b_a, device=device)
