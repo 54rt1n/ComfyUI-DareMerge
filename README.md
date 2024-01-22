@@ -31,4 +31,4 @@ DARE-TIES does a stochastic selection of the parameters to keep, and then only p
 * Take model B, and merge it in to model A using the mask to protect model A's largest parameters.
 
 ### Normalization
-I am testing out a new normalization method, which is to normalize the norm of the parameters of one model to another.  This is done by taking the ratio of the norms, and then scaling the parameters of the first model by that ratio.  This is done in the `Normalize Model` node.  There are a few options, of most interest is the 'q_norm' option, which only scales Q and K relative to each other.
+I am testing out a new normalization method, which is to normalize the norm of the parameters of one model to another.  This is done by taking the ratio of the norms, and then scaling the parameters of the first model by that ratio.  This is done in the `Normalize Model` node.  There are a few options, of most interest is the 'attn_only' option, which only scales Q and K relative to each other, and just that.

@@ -36,7 +36,7 @@ class NormalizeUnet:
             "required": {
                 "model_a": ("MODEL",),
                 "model_b": ("MODEL",),
-                "method": (["q_norm", "all", "none", "attn_only"], ),
+                "method": (["q_norm", "all", "none", "attn_only"], {"default": "attn_only"}),
             }
         }
 
