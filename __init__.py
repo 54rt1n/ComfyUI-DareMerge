@@ -1,21 +1,27 @@
-from .merge.dare import DareModelMerger
-from .merge.dareMBW import DareModelMergerMBW
-from .merge.mag import MagnitudePruningModelMerger
-from .merge.block import BlockModelMergerAdv
+from .components.clip import DareClipMerger
+from .components.dare import DareUnetMerger
+from .components.dare_mbw import DareUnetMergerMBW
+from .components.block import BlockUnetMerger
+from .components.normalize import NormalizeUnet
+from .components.mask_model import MagnitudeMasker
 
 
 NODE_CLASS_MAPPINGS = {
-    "DareModelMerger": DareModelMerger,
-    "DareModelMergerMBW": DareModelMergerMBW,
-    "MagnitudeModelMerger": MagnitudePruningModelMerger,
-    "BlockModelMergerAdv": BlockModelMergerAdv,
+    "DM_MaskedModelMerger": BlockUnetMerger,
+    "DM_DareModelMerger": DareUnetMerger,
+    "DM_DareModelMergerMBW": DareUnetMergerMBW,
+    "DM_DareClipMerger": DareClipMerger,
+    "DM_NormalizeModel": NormalizeUnet,
+    "DM_MagnitudeMasker": MagnitudeMasker,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "DareModelMerger": "ModelMergeByDARE",
-    "DareModelMergerMBW": "ModelMergeByDAREMBW",
-    "MagnitudeModelMerger": "ModelMergeByMagnitudePruning",
-    "BlockModelMergerAdv": "ModelMergeByBlock (Advanced)",
+    "DM_MaskedModelMerger": "Model Merger (Masked)",
+    "DM_DareModelMerger": "Model Merger (DARE)",
+    "DM_DareModelMergerMBW": "MBW Merger (DARE)",
+    "DM_DareClipMerger": "CLIP Merger (DARE)",
+    "DM_NormalizeModel": "Normalize Model",
+    "DM_MagnitudeMasker": "Magnitude Masker",
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
