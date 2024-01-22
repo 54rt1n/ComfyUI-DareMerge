@@ -6,7 +6,7 @@ from typing import Dict, Tuple, Optional, Literal
 from .mergeutil import merge_tensors, patcher
 
 
-class DareModelMerger:
+class DareModelMergerMBW:
     """
     A class to merge two diffusion U-Net models using calculated deltas, sparsification,
     and a weighted consensus method. This is the DARE method.
@@ -24,39 +24,42 @@ class DareModelMerger:
         Returns:
             Dict[str, tuple]: A dictionary specifying the required model types and parameters.
         """
-        return {
-            "required": {
+        arg_dict = {
                 "model_a": ("MODEL",),
                 "model_b": ("MODEL",),
-                "drop_rate": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "drop_rate": ("FLOAT", {"default": 0.85, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "ties": (["sum", "count", "off"], {"default": "sum"}),
-                "rescale": (["off", "on"], {"default": "off"}),
-                "seed": ("INT", {"default": 42}),
-                "input": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "middle": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "out": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "time": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "rescale": (["off", "on"], {"default": "on"}),
+                "seed": ("INT", {"default": 1, "min":0, "max": 99999999999}),
                 "method": (["comfy", "lerp", "slerp", "gradient"], ),
                 "exclude_a": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "include_b": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "threshold_type": (["median", "quantile"], {"default": "median"}),
                 "invert": (["No", "Yes"], {"default": "No"}),
                 "iterations": ("INT", {"default": 1, "min": 1, "max": 100, "step": 1}),
-            },
-            "optional": {
-                "base_model": ("MODEL",),
-            }
+                "time": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "label": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
         }
+        argument = ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01})
+        for i in range(12):
+            arg_dict[f"input_blocks.{i}"] = argument
+        for i in range(3):
+            arg_dict[f"middle_block.{i}"] = argument
+        for i in range(12):
+            arg_dict[f"output_blocks.{i}"] = argument
+        arg_dict["out"] = argument
+        opt = {"base_model": ("MODEL",)}
+        return {"required": arg_dict ,"optional": opt}
 
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "merge"
-    CATEGORY = "ddare/dare"
+    CATEGORY = "ddare/dareMBW"
 
     def merge(self, model_a: ModelPatcher, model_b: ModelPatcher, 
-              input: float, middle: float, out: float, time: float, method : str,
+              time: float, label: float, method : str,
               seed : Optional[int] = None, clear_cache : bool = True,
               base_model: Optional[ModelPatcher] = None, iterations : int = 1,
-              **kwargs) -> Tuple[ModelPatcher]:
+              **kwargs,) -> Tuple[ModelPatcher]:
         """
         Merges two ModelPatcher instances based on the weighted consensus of their parameters and sparsity.
 
@@ -105,17 +108,41 @@ class DareModelMerger:
             k_unet = k[len("diffusion_model."):]
 
             # Get our ratio for this layer
-            if k_unet.startswith("input"):
-                ratio = input
-            elif k_unet.startswith("middle"):
-                ratio = middle
-            elif k_unet.startswith("out"):
-                ratio = out
+            #デバッグ用にごちゃごちゃしちゃったけど各break以降は画像に影響しないよ
+            if k_unet.startswith(f"input_blocks"):
+                for i in range(12):
+                    if k_unet.startswith(f"input_blocks.{i}"):
+                        ratio = kwargs[f"input_blocks.{i}"]
+                        break
+                    elif i==11:
+                        print(f"Unknown key: {k_unet},i={i}")
+                        continue
+            elif k_unet.startswith(f"middle_block"):
+                for i in range(3):
+                    if k_unet.startswith(f"middle_block.{i}"):
+                        ratio = kwargs[f"middle_block.{i}"]
+                        break
+                    elif i==2:
+                        print(f"Unknown key: {k_unet},i={i}")
+                        continue
+            elif k_unet.startswith(f"output_blocks"):
+                for i in range(12):
+                    if k_unet.startswith(f"output_blocks.{i}"):
+                        ratio = kwargs[f"output_blocks.{i}"]
+                        break
+                    elif i==11:
+                        print(f"Unknown key: {k_unet},i={i}")
+                        continue
+            elif k_unet.startswith("out."):
+                ratio = kwargs["out"]
             elif k_unet.startswith("time"):
                 ratio = time
+            elif k_unet.startswith("label_emb"):
+                ratio  = label
             else:
                 print(f"Unknown key: {k}, skipping.")
                 continue
+            
 
             # Apply sparsification by the delta, I don't know if all of this cuda stuff is necessary
             # but I had so many memory issues that I'm being very careful
