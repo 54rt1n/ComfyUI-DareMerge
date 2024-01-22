@@ -37,6 +37,7 @@ class NormalizeUnet:
                 "model_a": ("MODEL",),
                 "model_b": ("MODEL",),
                 "method": (["q_norm", "all", "none", "attn_only"], {"default": "attn_only"}),
+                "magnify": (["off", "on"], {"default": "off"}),
             }
         }
 
@@ -89,7 +90,7 @@ class NormalizeUnet:
 
         return key_groups
 
-    def normalize(self, model_a: ModelPatcher, model_b: ModelPatcher, method : str, **kwargs) -> Tuple[ModelPatcher]:
+    def normalize(self, model_a: ModelPatcher, model_b: ModelPatcher, method : str, magnify : str = "off", **kwargs) -> Tuple[ModelPatcher]:
         """
         Scales model A by the scaling factor calculated from model B.
 
@@ -104,6 +105,10 @@ class NormalizeUnet:
         """
 
         device = get_device()
+
+        scaler = lambda a,b: relative_norm(a,b)
+        if magnify == "on":
+            scaler = lambda a,b: relative_norm(b,a)
 
         with cuda_memory_profiler():
             m = model_a.clone()  # Clone model_a to keep its structure
@@ -146,7 +151,7 @@ class NormalizeUnet:
                     weight_b : torch.Tensor = model_b_sd[weight_key].to(device)
                     bias_a : torch.Tensor = model_a_sd[bias_key].to(device)
 
-                    scale = relative_norm(weight_a, weight_b).to(device)
+                    scale = scaler(weight_a, weight_b).to(device)
                     na = torch.empty_like(weight_a, device=device)
                     na = weight_a * scale
                     nb = torch.empty_like(weight_b, device=device)
@@ -174,14 +179,14 @@ class NormalizeUnet:
                     out_w_a : torch.Tensor = model_a_sd[out_w].to(device)
                     out_w_b : torch.Tensor = model_b_sd[out_w].to(device)
                     out_b_a : torch.Tensor = model_a_sd[out_b].to(device)
-                    scale_a = relative_norm(q_a, q_b).to(device)
+                    scale_a = scaler(q_a, q_b).to(device)
                     # allocate q, k, v, out_w, out_b
                     nq = torch.empty_like(q_a, device=device)
                     nq = q_a.to(device) * scale_a
                     nk = torch.empty_like(k_a, device=device)
                     nk = k_a.to(device) / scale_a
                     #v_a = v_a.copy_(v_a * scale).to("cpu")
-                    scale_o = relative_norm(out_w_a, out_w_b)
+                    scale_o = scaler(out_w_a, out_w_b)
                     nout_w = torch.empty_like(out_w_a, device=device)
                     nout_w = out_w_a.to(device) * scale_o
                     nout_b = torch.empty_like(out_b_a, device=device)
