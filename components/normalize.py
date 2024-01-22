@@ -4,7 +4,8 @@ from typing import Dict, Tuple
 
 from comfy.model_patcher import ModelPatcher
 from ..ddare.util import cuda_memory_profiler, get_device
-from ..ddare.const import EPSILON, UTIL_CATEGORY
+from ..ddare.tensor import relative_norm
+from ..ddare.const import UTIL_CATEGORY
 
 """
 These are the layers that we are going to normalize, and how we are going to normalize them:
@@ -145,7 +146,7 @@ class NormalizeUnet:
                     weight_b : torch.Tensor = model_b_sd[weight_key].to(device)
                     bias_a : torch.Tensor = model_a_sd[bias_key].to(device)
 
-                    scale = self._calculate_scaling_factor(weight_a, weight_b).to(device)
+                    scale = relative_norm(weight_a, weight_b).to(device)
                     na = torch.empty_like(weight_a, device=device)
                     na = weight_a * scale
                     nb = torch.empty_like(weight_b, device=device)
@@ -215,20 +216,3 @@ class NormalizeUnet:
                 pass
 
         return (m,)
-
-    @staticmethod
-    def _calculate_scaling_factor(weight_a: torch.Tensor, weight_b: torch.Tensor) -> float:
-        """
-        Calculate the scaling factor to adjust the scale of weight_a to match weight_b.
-
-        Args:
-            weight_a (torch.Tensor): Weight tensor of this instance.
-            weight_b (torch.Tensor): Weight tensor of the other instance.
-
-        Returns:
-            float: Scaling factor.
-        """
-        norm_a = torch.norm(weight_a)
-        norm_b = torch.norm(weight_b)
-        return norm_b / (norm_a + EPSILON)  # Adding epsilon to avoid division by zero
-    

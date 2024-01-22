@@ -3,7 +3,8 @@ from comfy.model_patcher import ModelPatcher
 import torch
 from typing import Dict, Tuple, Optional
 
-from ..ddare.merge import merge_tensors, dare_ties_sparsification
+from ..ddare.merge import merge_tensors
+from ..ddare.tensor import dare_ties_sparsification
 from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
 from ..ddare.mask import ModelMask
 from ..ddare.const import UNET_CATEGORY
