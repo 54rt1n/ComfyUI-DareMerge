@@ -49,7 +49,7 @@ def get_patched_state(model : ModelPatcher) -> Dict[str, torch.Tensor]:
         Dict[str, torch.Tensor]: The patched state dict.
     """
     if len(model.patches) > 0:
-        print("Model  has patches, applying them")
+        print("Model has patches, applying them")
         model.patch_model(None, True)
         model_sd = model.model_state_dict()
         model.unpatch_model()

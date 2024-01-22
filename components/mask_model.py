@@ -3,7 +3,7 @@ from comfy.model_patcher import ModelPatcher
 import torch
 from typing import Dict, Tuple
 
-from ..ddare.util import cuda_memory_profiler, get_device
+from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
 from ..ddare.mask import ModelMask
 from ..ddare.const import MASK_CATEGORY
 
@@ -55,21 +55,8 @@ class MagnitudeMasker:
         device = get_device()
 
         with cuda_memory_profiler():
-            if len(model_a.patches) > 0:
-                print("Model A has patches, applying them")
-                model_a.patch_model(None, True)
-                model_a_sd = model_a.model_state_dict()
-                model_a.unpatch_model()
-            else:
-                model_a_sd = model_a.model_state_dict()
-
-            if len(model_b.patches) > 0:
-                print("Model B has patches, applying them")
-                model_b.patch_model(None, True)
-                model_b_sd = model_b.model_state_dict()
-                model_b.unpatch_model()
-            else:
-                model_b_sd = model_b.model_state_dict()
+            model_a_sd = get_patched_state(model_a)
+            model_b_sd = get_patched_state(model_b)
 
             mm = ModelMask({})
 

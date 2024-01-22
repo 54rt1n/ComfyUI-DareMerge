@@ -1,5 +1,5 @@
 # ComfyUI-DareMerge
-Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM), sort of.  Now with TIES.
+Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).  Now with CLIP support.
 
 # Node List
 
@@ -29,6 +29,8 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM),
 DARE-TIES does a stochastic selection of the parameters to keep, and then only performs updates in either the 'up' or 'down' direction.  According to the paper, the workflow should be as such:
 * Take our model A, and build a magnitude mask based on a base model.
 * Take model B, and merge it in to model A using the mask to protect model A's largest parameters.
+
+*Of note, this merge method does use random sampling, so you should not just assume that your first random seed is the best one for your merge, and if it is not set to fixed that the merge will change every run.*
 
 ### Normalization
 I am testing out a new normalization method, which is to normalize the norm of the parameters of one model to another.  This is done by taking the ratio of the norms, and then scaling the parameters of the first model by that ratio.  This is done in the `Normalize Model` node.  There are a few options, of most interest is the 'attn_only' option, which only scales Q and K relative to each other, and just that.  You should see no difference in the model's performance, but it might make the merge more stable.
