@@ -105,7 +105,7 @@ class MagnitudeMasker:
             # We can easily overrun memory with large tensors, so we chunk the tensor
             delta_threshold = self.process_in_chunks(tensor=absolute_delta, threshold=threshold, **kwargs)
             # Create a mask for values to keep or preserve (above the threshold)
-            mask = absolute_delta >= delta_threshold if invert == 'No' else absolute_delta < delta_threshold
+            mask = absolute_delta < delta_threshold if invert == 'No' else absolute_delta >= delta_threshold
             #print(f"Delta threshold: {delta_threshold} Mask: {absolute_delta.sum()} / {absolute_delta.numel()} invert: {invert} threshold: {threshold} Above: ({mask.sum()}) Below ({(mask == False).sum()})")
 
         return mask.view_as(model_a_param)
