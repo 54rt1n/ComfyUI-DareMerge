@@ -28,6 +28,7 @@ class BlockUnetMerger:
                 "model_mask": ("MODEL_MASK",),
                 "input": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "middle": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "output": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "out": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "time": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "method": (["comfy", "lerp", "slerp", "gradient"], ),
@@ -41,7 +42,7 @@ class BlockUnetMerger:
     CATEGORY = UNET_CATEGORY
 
     def merge(self, model_a: ModelPatcher, model_b: ModelPatcher,
-              input : float, middle : float, out : float, time : float, method : str,
+              input : float, middle : float, output : float, out : float, time : float, method : str,
               clear_cache : bool = True, model_mask: Optional[ModelMask] = None,
               **kwargs) -> Tuple[ModelPatcher]:
         """
@@ -52,6 +53,7 @@ class BlockUnetMerger:
             model_b (ModelPatcher): The model to merge into the base model.
             input (float): The ratio (lambda) of the input layer to keep from model_a.
             middle (float): The ratio (lambda) of the middle layers to keep from model_a.
+            output (float): The ratio (lambda) of the output layer to keep from model_a.
             out (float): The ratio (lambda) of the output layer to keep from model_a.
             time (float): The ratio (lambda) of the time layers to keep from model_a.
             method (str): The method to use for merging, either "comfy", "lerp", "slerp", or "gradient".
@@ -87,6 +89,8 @@ class BlockUnetMerger:
                     ratio = input
                 elif k_unet.startswith("middle"):
                     ratio = middle
+                elif k_unet.startswith("output"):
+                    ratio = output
                 elif k_unet.startswith("out"):
                     ratio = out
                 elif k_unet.startswith("time"):
