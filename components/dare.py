@@ -109,6 +109,7 @@ class DareUnetMerger:
                     sparsified_delta = dare_ties_sparsification(merged_a, b, device=device, **kwargs)
                     # If we have a mask, apply it to the delta, replacing true values with our delta
                     if mask is not None:
+                        #print(f"Merging {k} with mask Included: {torch.count_nonzero(mask)}, Excluded: {torch.count_nonzero(~mask)}")
                         sparsified_delta = torch.where(mask.to(device), sparsified_delta.to(device), merged_a.to(device))
 
                     if method == "comfy":

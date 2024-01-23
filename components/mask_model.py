@@ -30,7 +30,7 @@ class MagnitudeMasker:
                 "model_b": ("MODEL",),
                 "threshold": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "threshold_type": (["median", "quantile"], {"default": "median"}),
-                "invert": (["No", "Yes"], {"default": "No"}),
+                "select": (["above", "below"], {"default": "below"}),
             }
         }
 
@@ -74,7 +74,7 @@ class MagnitudeMasker:
 
         return (mm,)
 
-    def get_threshold_mask(self, model_a_param: torch.Tensor, model_b_param: torch.Tensor, device : torch.device, threshold: float, invert: str, **kwargs) -> torch.Tensor:
+    def get_threshold_mask(self, model_a_param: torch.Tensor, model_b_param: torch.Tensor, device : torch.device, threshold: float, select: str, **kwargs) -> torch.Tensor:
         """
         Gets a mask of the delta parameter based on the specified sparsity level.
         
@@ -94,19 +94,21 @@ class MagnitudeMasker:
         model_b_flat = model_b_param.view(-1).float().to(device)
         delta_flat = model_b_flat - model_a_flat
 
-        invertion = 1 if invert == 'No' else 0
+        invertion = 0 if select == 'below' else 1
         if threshold == 1.0:
-            mask = torch.ones_like(delta_flat) == invertion
-        elif threshold == 0.0:
             mask = torch.zeros_like(delta_flat) == invertion
+            #print(f"select: {select} threshold: {threshold} Selected: ({mask.sum()}) Excluded: ({(mask == False).sum()})")
+        elif threshold == 0.0:
+            mask = torch.ones_like(delta_flat) == invertion
+            #print(f"select: {select} threshold: {threshold} Selected: ({mask.sum()}) Excluded: ({(mask == False).sum()})")
         else:
             absolute_delta = torch.abs(delta_flat)
 
             # We can easily overrun memory with large tensors, so we chunk the tensor
             delta_threshold = self.process_in_chunks(tensor=absolute_delta, threshold=threshold, **kwargs)
             # Create a mask for values to keep or preserve (above the threshold)
-            mask = absolute_delta < delta_threshold if invert == 'No' else absolute_delta >= delta_threshold
-            #print(f"Delta threshold: {delta_threshold} Mask: {absolute_delta.sum()} / {absolute_delta.numel()} invert: {invert} threshold: {threshold} Above: ({mask.sum()}) Below ({(mask == False).sum()})")
+            mask = absolute_delta < delta_threshold if select == 'below' else absolute_delta >= delta_threshold
+            #print(f"select: {select} threshold: {threshold} Selected: ({mask.sum()}) Excluded: ({(mask == False).sum()}) Delta threshold: {delta_threshold} Mask: {absolute_delta.sum()} / {absolute_delta.numel()}")
 
         return mask.view_as(model_a_param)
 
@@ -127,8 +129,8 @@ class MagnitudeMasker:
             chunk = tensor[i:i + self.CHUNK_SIZE]
             if chunk.numel() == 0:
                 continue
-            threshold = torch.quantile(torch.abs(chunk), threshold).item()
-            thresholds.append(threshold)
+            athreshold = torch.quantile(torch.abs(chunk), threshold).item()
+            thresholds.append(athreshold)
         
         if threshold_type == "median":
             global_threshold = torch.median(torch.tensor(thresholds))
