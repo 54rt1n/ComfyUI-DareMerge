@@ -18,10 +18,19 @@ def patcher(model: ModelPatcher, key : str) -> Optional[torch.Tensor]:
     return out_weight
 
 @contextlib.contextmanager
-def cuda_memory_profiler():
+def cuda_memory_profiler(display : str = True):
     """
     A context manager for profiling CUDA memory usage in PyTorch.
     """
+    if display is False:
+        yield
+        return
+    
+    if not torch.cuda.is_available():
+        print("CUDA is not available, skipping memory profiling")
+        yield
+        return
+    
     torch.cuda.reset_peak_memory_stats()
     torch.cuda.synchronize()
     start_memory = torch.cuda.memory_allocated()

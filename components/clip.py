@@ -3,10 +3,10 @@ from comfy.sd import CLIP
 import torch
 from typing import Optional
 
+from ..ddare.const import CLIP_CATEGORY
 from ..ddare.merge import merge_tensors
 from ..ddare.tensor import dare_ties_sparsification
 from ..ddare.util import cuda_memory_profiler, get_device
-from ..ddare.const import CLIP_CATEGORY
 
 
 class DareClipMerger:

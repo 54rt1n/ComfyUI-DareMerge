@@ -3,10 +3,10 @@ from comfy.model_patcher import ModelPatcher
 import torch
 from typing import Dict, Tuple, Optional
 
+from ..ddare.const import UNET_CATEGORY
+from ..ddare.mask import ModelMask
 from ..ddare.merge import merge_tensors
 from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
-from ..ddare.mask import ModelMask
-from ..ddare.const import UNET_CATEGORY
 
 
 class BlockUnetMerger:

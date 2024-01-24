@@ -3,9 +3,10 @@ from comfy.model_patcher import ModelPatcher
 import torch
 from typing import Dict, Tuple
 
-from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
-from ..ddare.mask import ModelMask
 from ..ddare.const import MASK_CATEGORY
+from ..ddare.mask import ModelMask
+from ..ddare.tensor import get_threshold_mask
+from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
 
 
 class MagnitudeMasker:
@@ -13,8 +14,6 @@ class MagnitudeMasker:
     A managed state dict to allow for masking of model layers.  This is used for protecting
     layers from being overwritten by the merge process.
     """
-
-    CHUNK_SIZE = 10**7  # Constant chunk size for memory management
 
     @classmethod
     def INPUT_TYPES(cls) -> Dict[str, tuple]:
@@ -69,76 +68,8 @@ class MagnitudeMasker:
                 a : torch.Tensor = model_a_sd[k]
                 b : torch.Tensor = model_b_sd[k]
 
-                layer_mask = self.get_threshold_mask(a, b, device=device, **kwargs)
+                layer_mask = get_threshold_mask(a, b, device=device, **kwargs)
                 mm.add_layer_mask(k, layer_mask)
 
         return (mm,)
-
-    def get_threshold_mask(self, model_a_param: torch.Tensor, model_b_param: torch.Tensor, device : torch.device, threshold: float, select: str, **kwargs) -> torch.Tensor:
-        """
-        Gets a mask of the delta parameter based on the specified sparsity level.
-        
-        Args:
-            model_a_param (torch.Tensor): The parameter from model_a.
-            model_b_param (torch.Tensor): The parameter from model_b.
-            device (torch.device): The device to use for the mask.
-            threshold (float): The sparsity level to use.
-            invert (str): Whether to invert the mask or not.
-            **kwargs: Additional arguments specifying the merge ratios for different layers and sparsity.
-            
-        Returns:
-            torch.Tensor: The mask of the delta parameter.
-        """
-
-        model_a_flat = model_a_param.view(-1).float().to(device)
-        model_b_flat = model_b_param.view(-1).float().to(device)
-        delta_flat = model_b_flat - model_a_flat
-
-        invertion = 0 if select == 'below' else 1
-        if threshold == 1.0:
-            mask = torch.zeros_like(delta_flat) == invertion
-            #print(f"select: {select} threshold: {threshold} Selected: ({mask.sum()}) Excluded: ({(mask == False).sum()})")
-        elif threshold == 0.0:
-            mask = torch.ones_like(delta_flat) == invertion
-            #print(f"select: {select} threshold: {threshold} Selected: ({mask.sum()}) Excluded: ({(mask == False).sum()})")
-        else:
-            absolute_delta = torch.abs(delta_flat)
-
-            # We can easily overrun memory with large tensors, so we chunk the tensor
-            delta_threshold = self.process_in_chunks(tensor=absolute_delta, threshold=threshold, **kwargs)
-            # Create a mask for values to keep or preserve (above the threshold)
-            mask = absolute_delta < delta_threshold if select == 'below' else absolute_delta >= delta_threshold
-            #print(f"select: {select} threshold: {threshold} Selected: ({mask.sum()}) Excluded: ({(mask == False).sum()}) Delta threshold: {delta_threshold} Mask: {absolute_delta.sum()} / {absolute_delta.numel()}")
-
-        return mask.view_as(model_a_param)
-
-    def process_in_chunks(self, tensor: torch.Tensor, threshold: float, threshold_type : str, **kwargs) -> float:
-        """
-        Processes the tensor in chunks and calculates the quantile thresholds for each chunk to determine our layer threshold.
-
-        Args:
-            tensor (torch.Tensor): The tensor to process.
-            threshold (float): The quantile threshold to use.
-            threshold_type (str): The type of threshold to use, either "median" or "quantile".
-            
-        Returns:
-            float: The layer threshold.
-        """
-        thresholds = []
-        for i in range(0, tensor.numel(), self.CHUNK_SIZE):
-            chunk = tensor[i:i + self.CHUNK_SIZE]
-            if chunk.numel() == 0:
-                continue
-            athreshold = torch.quantile(torch.abs(chunk), threshold).item()
-            thresholds.append(athreshold)
-        
-        if threshold_type == "median":
-            global_threshold = torch.median(torch.tensor(thresholds))
-        else:
-            sorted_thresholds = sorted(thresholds)
-            index = int(threshold * len(sorted_thresholds))
-            index = max(0, min(index, len(sorted_thresholds) - 1))
-            global_threshold = sorted_thresholds[index]
-        
-        return global_threshold
 

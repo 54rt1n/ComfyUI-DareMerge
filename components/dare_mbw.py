@@ -3,11 +3,11 @@ from comfy.model_patcher import ModelPatcher
 import torch
 from typing import Dict, Tuple, Optional, Literal
 
+from ..ddare.const import UNET_CATEGORY
+from ..ddare.mask import ModelMask
 from ..ddare.merge import merge_tensors
 from ..ddare.tensor import dare_ties_sparsification
 from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
-from ..ddare.mask import ModelMask
-from ..ddare.const import UNET_CATEGORY
 
 
 class DareUnetMergerMBW:
@@ -172,48 +172,3 @@ class DareUnetMergerMBW:
             print(f"Unknown key: {key}, skipping.")
 
         return ratio
-
-    def apply_sparsification(self, base_model_param: Optional[torch.Tensor], model_a_param: torch.Tensor, model_b_param: torch.Tensor,
-                             exclude_a: float, include_b: float, invert : str, drop_rate: float, ties : str, rescale : str,
-                             device : torch.device, **kwargs) -> torch.Tensor:
-        """
-        Applies sparsification to a tensor based on the specified sparsity level.
-        """
-
-        model_a_flat = model_a_param.view(-1).float().to(device)
-        model_b_flat = model_b_param.view(-1).float().to(device)
-        delta_flat = model_b_flat - model_a_flat
-
-        if base_model_param is not None:
-            base_model_flat = base_model_param.view(-1).float().to(device)
-            delta_a_flat = model_a_flat - base_model_flat
-            delta_b_flat = model_b_flat - base_model_flat
-            
-            include_mask = self.get_threshold_mask(delta_b_flat, include_b, invert, **kwargs)
-            exclude_mask = self.get_threshold_mask(delta_a_flat, exclude_a, invert, **kwargs)
-            base_mask = include_mask & (~exclude_mask)
-            del base_model_flat, delta_a_flat, delta_b_flat, include_mask, exclude_mask
-        else:
-            include_mask = torch.ones_like(model_a_flat).bool()
-            exclude_mask = torch.zeros_like(model_a_flat).bool()
-            base_mask = include_mask & (~exclude_mask)
-            del include_mask, exclude_mask
-
-        if ties != "off":
-            ties_mask = self.get_ties_mask(delta_flat, ties)
-            base_mask = base_mask & ties_mask
-            del ties_mask
-        
-        dare_mask = torch.bernoulli(torch.full(delta_flat.shape, 1 - drop_rate, device=device)).bool()
-        # The paper says we should rescale, but it yields terrible results for SD
-        if rescale == "on":
-            # Rescale the remaining deltas
-            delta_flat = delta_flat / (1 - drop_rate)
-        
-        final_mask = dare_mask & base_mask
-        # print(f"mask nonzero count: {torch.count_nonzero(mask)} dare nonzero count: {torch.count_nonzero(dare_mask)} base nonzero count: {torch.count_nonzero(base_mask)} include nonzero count: {torch.count_nonzero(include_mask)} exclude nonzero count: {torch.count_nonzero(exclude_mask)}")
-
-        sparsified_flat = torch.where(final_mask, model_a_flat + delta_flat, model_a_flat)
-        del final_mask, delta_flat, base_mask, model_a_flat, model_b_flat, dare_mask
-        
-        return sparsified_flat.view_as(model_a_param)

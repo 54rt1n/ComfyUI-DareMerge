@@ -1,11 +1,11 @@
 # components/normalize.py
+from comfy.model_patcher import ModelPatcher
 import torch
 from typing import Dict, Tuple
 
-from comfy.model_patcher import ModelPatcher
-from ..ddare.util import cuda_memory_profiler, get_device
-from ..ddare.tensor import relative_norm
 from ..ddare.const import UTIL_CATEGORY
+from ..ddare.tensor import relative_norm
+from ..ddare.util import cuda_memory_profiler, get_device
 
 """
 These are the layers that we are going to normalize, and how we are going to normalize them:
