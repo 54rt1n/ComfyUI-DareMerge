@@ -1,8 +1,12 @@
 # ddare/merge.py
 # Credit to https://github.com/Gryphe/MergeMonster
+# and https://github.com/WASasquatch/FreeU_Advanced/nodes.py
 import torch
+from typing import Optional
 
 from .const import EPSILON
+
+METHODS = ["lerp", "slerp", "slice", "cyclic", "gradient", "hslerp", "bislerp", "colorize", "cosine", "cubic", "scaled_add"]
 
 def merge_tensors(method: str, v0: torch.Tensor, v1: torch.Tensor, t: float) -> torch.Tensor:
     if method == "lerp":
@@ -15,6 +19,20 @@ def merge_tensors(method: str, v0: torch.Tensor, v1: torch.Tensor, t: float) -> 
         return merge_tensors_cyclic(v0, v1, t)
     elif method == "gradient":
         return merge_tensors_gradient(v0, v1, t)
+    elif method == "hslerp":
+        return merge_tensors_hslerp(v0, v1, t)
+    elif method == "bislerp":
+        return merge_tensors_bislerp(v0, v1, t)
+    elif method == "colorize":
+        return merge_tensors_colorize(v0, v1, t)
+    elif method == "cosine":
+        return merge_tensors_cosine_interpolation(v0, v1, t)
+    elif method == "cubic":
+        return merge_tensors_cubic_interpolation(v0, v1, t)
+    elif method == "scaled_add":
+        return merge_tensors_scaled_add(v0, v1, t)
+    else:
+        raise ValueError(f"Unknown merge method: {method}")
 
 def merge_tensors_lerp(v0: torch.Tensor, v1: torch.Tensor, t: float) -> torch.Tensor:
     """Linear interpolation between two tensors."""
@@ -63,8 +81,155 @@ def merge_tensors_slerp(v0: torch.Tensor, v1: torch.Tensor, t: float, dot_thresh
 
     return result
 
-# MODEL 1 > 10% blend > MODEL 2
+def normalize_rescale(latent: torch.Tensor, target_min : Optional[float] = None, target_max : Optional[float] = None) -> torch.Tensor:
+    """
+    Normalize a tensor `latent` between `target_min` and `target_max`.
+
+    Args:
+        latent (torch.Tensor): The input tensor to be normalized.
+        target_min (float, optional): The minimum value after normalization.
+            - When `None` min will be tensor min range value.
+        target_max (float, optional): The maximum value after normalization.
+            - When `None` max will be tensor max range value.
+
+    Returns:
+        torch.Tensor: The normalized tensor
+    """
+    min_val = latent.min()
+    max_val = latent.max()
+
+    if target_min is None:
+        target_min = min_val
+    if target_max is None:
+        target_max = max_val
+
+    normalized = (latent - min_val) / (max_val - min_val)
+    scaled = normalized * (target_max - target_min) + target_min
+    return scaled
+
+def merge_tensors_hslerp(a : torch.Tensor, b : torch.Tensor, t : float) -> torch.Tensor:
+    """
+    Perform Hybrid Spherical Linear Interpolation (HSLERP) between two tensors.
+
+    This function combines two input tensors `a` and `b` using HSLERP, which is a specialized
+    interpolation method for smooth transitions between orientations or colors.
+
+    Args:
+        a (tensor): The first input tensor.
+        b (tensor): The second input tensor.
+        t (float): The blending factor, a value between 0 and 1 that controls the interpolation.
+
+    Returns:
+        tensor: The result of HSLERP interpolation between `a` and `b`.
+
+    Note:
+        HSLERP provides smooth transitions between orientations or colors, particularly useful
+        in applications like image processing and 3D graphics.
+    """
+    if a.shape != b.shape:
+        raise ValueError("Input tensors a and b must have the same shape.")
+
+    num_channels = a.size(1)
+
+    interpolation_tensor = torch.zeros(1, num_channels, 1, 1, device=a.device, dtype=a.dtype)
+    interpolation_tensor[0, 0, 0, 0] = 1.0
+
+    result = (1 - t) * a + t * b
+
+    if t < 0.5:
+        result += (torch.norm(b - a, dim=1, keepdim=True) / 6) * interpolation_tensor
+    else:
+        result -= (torch.norm(b - a, dim=1, keepdim=True) / 6) * interpolation_tensor
+
+    return result
+
+def merge_tensors_bislerp(a : torch.Tensor, b : torch.Tensor, t : float) -> torch.Tensor:
+    """
+    Perform Bidirectional Spherical Linear Interpolation (BISLERP) between two tensors.
+    
+    Args:
+        a (tensor): The first input tensor.
+        b (tensor): The second input tensor.
+        t (float): The blending factor, a value between 0 and 1 that controls the interpolation.
+        
+    Returns:
+        tensor: The result of BISLERP interpolation between `a` and `b`.
+    """
+
+    return normalize_rescale((1 - t) * a + t * b)
+
+def merge_tensors_colorize(a : torch.Tensor, b : torch.Tensor, t : float) -> torch.Tensor:
+    """
+    Perform colorization between two tensors.
+    
+    Args:
+        a (tensor): The first input tensor.
+        b (tensor): The second input tensor.
+        t (float): The blending factor, a value between 0 and 1 that controls the interpolation.
+        
+    Returns:
+        tensor: The result of colorization between `a` and `b`.
+    """
+    
+    return a + (b - a) * t
+
+def merge_tensors_cosine_interpolation(a : torch.Tensor, b : torch.Tensor, t : float) -> torch.Tensor:
+    """
+    Perform cosine interpolation between two tensors.
+    
+    Args:
+        a (tensor): The first input tensor.
+        b (tensor): The second input tensor.
+        t (float): The blending factor, a value between 0 and 1 that controls the interpolation.
+        
+    Returns:
+        tensor: The result of cosine interpolation between `a` and `b`.
+    """
+    
+    return (a + b - (a - b) * torch.cos(t * torch.tensor(torch.pi))) / 2
+
+def merge_tensors_cubic_interpolation(a : torch.Tensor, b : torch.Tensor, t : float) -> torch.Tensor:
+    """
+    Perform cubic interpolation between two tensors.
+    
+    Args:
+        a (tensor): The first input tensor.
+        b (tensor): The second input tensor.
+        t (float): The blending factor, a value between 0 and 1 that controls the interpolation.
+        
+    Returns:
+        tensor: The result of cubic interpolation between `a` and `b`.
+    """
+
+    return a + (b - a) * (3 * t ** 2 - 2 * t ** 3)
+    
+def merge_tensors_scaled_add(a : torch.Tensor, b : torch.Tensor, t : float) -> torch.Tensor:
+    """
+    Perform additive blending between two tensors.  This adds the second tensor, scaled by `t`, to the first tensor.
+    
+    Args:
+        a (tensor): The first input tensor.
+        b (tensor): The second input tensor.
+        t (float): The blending factor, a value between 0 and 1 that controls the interpolation.
+        
+    Returns:
+        tensor: The result of additive blending between `a` and `b`. 
+    """
+    
+    return (a + b * t) / (1 + t)
+
 def merge_tensors_slice(v0: torch.Tensor, v1: torch.Tensor, t: float) -> torch.Tensor:
+    """
+    Blend two tensors by slicing them and blending the slices.
+    
+    Args:
+        v0 (tensor): The first input tensor.
+        v1 (tensor): The second input tensor.
+        t (float): The blending factor, a value between 0 and 1 that controls the interpolation.
+        
+    Returns:
+        tensor: The result of blending between `v0` and `v1`.
+    """
     # We're only working on the second dimension here
     if v0.dim() == 2:
         # Calculate the slice indices for each tensor

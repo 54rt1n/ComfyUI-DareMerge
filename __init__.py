@@ -3,7 +3,7 @@ from .components.dare import DareUnetMerger
 from .components.dare_mbw import DareUnetMergerMBW
 from .components.block import BlockUnetMerger
 from .components.normalize import NormalizeUnet
-from .components.mask_model import MagnitudeMasker
+from .components.mask_model import MagnitudeMasker, MaskOperations
 
 
 NODE_CLASS_MAPPINGS = {
@@ -13,6 +13,7 @@ NODE_CLASS_MAPPINGS = {
     "DM_DareClipMerger": DareClipMerger,
     "DM_NormalizeModel": NormalizeUnet,
     "DM_MagnitudeMasker": MagnitudeMasker,
+    "DM_MaskOperations": MaskOperations,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -22,6 +23,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DM_DareClipMerger": "CLIP Merger (DARE)",
     "DM_NormalizeModel": "Normalize Model",
     "DM_MagnitudeMasker": "Magnitude Masker",
+    "DM_MaskOperations": "Mask Operations",
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']

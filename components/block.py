@@ -5,7 +5,7 @@ from typing import Dict, Tuple, Optional
 
 from ..ddare.const import UNET_CATEGORY
 from ..ddare.mask import ModelMask
-from ..ddare.merge import merge_tensors
+from ..ddare.merge import merge_tensors, METHODS
 from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
 
 
@@ -32,7 +32,7 @@ class BlockUnetMerger:
                 "middle": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "output": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "out": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "method": (["comfy", "lerp", "slerp", "gradient"], ),
+                "method": (["comfy",] + METHODS, {"default": "comfy"} ),
             },
             "optional": {
             }

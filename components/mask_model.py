@@ -73,3 +73,51 @@ class MagnitudeMasker:
 
         return (mm,)
 
+
+class MaskOperations:
+    """
+    Take two masks and perform a set operation.  union, intersect, difference, xor
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls) -> Dict[str, tuple]:
+        """
+        Defines the input types for the masking process.
+
+        Returns:
+            Dict[str, tuple]: A dictionary specifying the required model types and parameters.
+        """
+        return {
+            "required": {
+                "mask_a": ("MODEL_MASK",),
+                "mask_b": ("MODEL_MASK",),
+                "operation": (["union", "intersect", "difference", "xor"], {"default": "union"}),
+            }
+        }
+        
+    RETURN_TYPES = ("MODEL_MASK",)
+    FUNCTION = "mask_ops"
+    CATEGORY = MASK_CATEGORY
+    
+    def mask_ops(self, mask_a: ModelMask, mask_b: ModelMask, operation: str = "union", **kwargs) -> Tuple[ModelMask]:
+        """
+        Take two masks and perform a set operation.  union, intersect, difference, xor
+
+        Args:
+            mask_a (ModelMask): The first mask.
+            mask_b (ModelMask): The second mask.
+            operation (str): The operation to perform.
+
+        Returns:
+            Tuple[ModelMask]: A tuple containing the mask.
+        """
+        if operation == "union":
+            return (ModelMask.union(mask_a, mask_b),)
+        elif operation == "intersect":
+            return (ModelMask.intersect(mask_a, mask_b),)
+        elif operation == "difference":
+            return (ModelMask.set_difference(mask_a, mask_b),)
+        elif operation == "xor":
+            return (ModelMask.symmetric_distance(mask_a, mask_b),)
+        else:
+            raise ValueError("Unknown operation: {}".format(operation))

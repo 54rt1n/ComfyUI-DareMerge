@@ -5,7 +5,7 @@ from typing import Dict, Tuple, Optional, Literal
 
 from ..ddare.const import UNET_CATEGORY
 from ..ddare.mask import ModelMask
-from ..ddare.merge import merge_tensors
+from ..ddare.merge import merge_tensors, METHODS
 from ..ddare.tensor import dare_ties_sparsification
 from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
 
@@ -34,7 +34,7 @@ class DareUnetMergerMBW:
                 "ties": (["sum", "count", "off"], {"default": "sum"}),
                 "rescale": (["off", "on"], {"default": "off"}),
                 "seed": ("INT", {"default": 1, "min":0, "max": 99999999999}),
-                "method": (["comfy", "lerp", "slerp", "gradient"], ),
+                "method": (["comfy",] + METHODS, {"default": "comfy"}),
                 "iterations": ("INT", {"default": 1, "min": 1, "max": 100, "step": 1}),
                 "time": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "label": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
