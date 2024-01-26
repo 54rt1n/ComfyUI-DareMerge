@@ -3,7 +3,7 @@ from .components.dare import DareUnetMerger
 from .components.dare_mbw import DareUnetMergerMBW
 from .components.block import BlockUnetMerger
 from .components.normalize import NormalizeUnet
-from .components.mask_model import MagnitudeMasker, MaskOperations, MaskEdit, SimpleMasker
+from .components.mask_model import MagnitudeMasker, MaskOperations, MaskEdit, SimpleMasker, QuadMasker
 from .components.reports import MaskReporting, ModelReporting
 
 
@@ -14,6 +14,7 @@ NODE_CLASS_MAPPINGS = {
     "DM_DareClipMerger": DareClipMerger,
     "DM_SimpleMasker": SimpleMasker,
     "DM_MagnitudeMasker": MagnitudeMasker,
+    "DM_QuadMasker": QuadMasker,
     "DM_MaskOperations": MaskOperations,
     "DM_MaskEdit": MaskEdit,
     "DM_ModelReporting": ModelReporting,
@@ -28,6 +29,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DM_DareClipMerger": "CLIP Merger (DARE)",
     "DM_SimpleMasker": "Simple Masker",
     "DM_MagnitudeMasker": "Magnitude Masker",
+    "DM_QuadMasker": "Quad Masker",
     "DM_MaskOperations": "Mask Operations",
     "DM_MaskEdit": "Mask Edit",
     "DM_ModelReporting": "Model Reporting",

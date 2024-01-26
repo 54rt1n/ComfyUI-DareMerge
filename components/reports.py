@@ -5,7 +5,7 @@ from collections import defaultdict
 import re
 from typing import Dict, Tuple
 
-from ..ddare.const import MASK_CATEGORY
+from ..ddare.const import REPORT_CATEGORY
 from ..ddare.mask import ModelMask
 from ..ddare.reporting import plot_model_layer, PLOT_SCALING
 from ..ddare.util import get_patched_state
@@ -47,7 +47,7 @@ class MaskReporting:
         
     RETURN_TYPES = ("STRING",)
     FUNCTION = "mask_report"
-    CATEGORY = MASK_CATEGORY
+    CATEGORY = REPORT_CATEGORY
     
     def mask_report(self, mask: ModelMask, report: str = "size", **kwargs) -> Tuple[str]:
         """
@@ -140,7 +140,7 @@ class ModelReporting:
         
     RETURN_TYPES = ("STRING","IMAGE",)
     FUNCTION = "model_report"
-    CATEGORY = MASK_CATEGORY
+    CATEGORY = REPORT_CATEGORY
     
     def model_report(self, model: ModelPatcher, layer: str, scaling : str, **kwargs) -> Tuple[str]:
         """

@@ -6,7 +6,7 @@ from typing import Dict, Tuple, List, Generator, Optional
 
 from ..ddare.const import MASK_CATEGORY
 from ..ddare.mask import ModelMask
-from ..ddare.tensor import get_threshold_mask, bernoulli_noise, gaussian_noise
+from ..ddare.tensor import get_threshold_mask, bernoulli_noise, gaussian_noise, divide_tensor_into_sets
 from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
 
 
@@ -349,3 +349,61 @@ class SimpleMasker:
             mm.add_layer_mask(k, mask)
 
         return (mm,)
+
+
+class QuadMasker:
+    """
+    A managed state dict to allow for masking of model layers.  This is used for protecting
+    layers from being overwritten by the merge process.  This node creates four masks, each
+    from a different slices of the model parameters.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls) -> Dict[str, tuple]:
+        """
+        Defines the input types for the masking process.
+
+        Returns:
+            Dict[str, tuple]: A dictionary specifying the required model types and parameters.
+        """
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "seed": ("INT", {"default": 1, "min":0, "max": 99999999999}),
+            }
+        }
+
+    RETURN_TYPES = ("MODEL_MASK","MODEL_MASK","MODEL_MASK","MODEL_MASK",)
+    FUNCTION = "mask"
+    CATEGORY = MASK_CATEGORY
+
+    def mask(self, model: ModelPatcher, seed: int = 1, **kwargs) -> Tuple[ModelMask]:
+        """
+        Takes a model and creates several masks for it.
+
+        Args:
+            model (ModelPatcher): The model to create a mask for.
+            seed (int): The random seed.  Only used for random and gaussian masks.
+
+        Returns:
+            Tuple[ModelPatcher]: A tuple containing the mask.
+        """
+
+        model_sd = model.model_state_dict()
+        mask_count = 4
+
+        mms = [ModelMask({}) for _ in range(mask_count)]
+
+        # Merge each parameter from model_b into model_a
+        for i, k in enumerate(model_sd.keys()):
+            tensor = model_sd[k]
+            sets = divide_tensor_into_sets(tensor, mask_count)
+
+            for j in range(mask_count):
+                if seed is not None:
+                    torch.manual_seed(seed + i * mask_count + j)
+                mask = sets == j
+                mms[j].add_layer_mask(k, mask)
+
+        return (*mms,)
+
