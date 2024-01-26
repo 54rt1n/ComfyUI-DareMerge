@@ -22,12 +22,18 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).
 |mask|Magnitude Masker|`MODEL`, `MODEL`|`MODEL_MASK`|Creates a mask based on the deltas of the parameters|
 |mask|Mask Operations|`MODEL_MASK`, `MODEL_MASK`|`MODEL_MASK`|Allows set operations to be performed on masks|
 |mask|Mask Edit|`MODEL_MASK`|`MODEL_MASK`|Allows the direct editing of mask layers|
-|mask|Mask Reporting|`MODEL_MASK`|`STRING`|Returns basic layer statistics for the mask|
 
 ## Utilities
 |category|node name|input type|output type|desc.|
 | --- | --- | --- | --- | --- |
 |util|Normalize Model|`MODEL`, `MODEL`|`MODEL`|Normalizes one models parameter norm to another model|
+
+## Reporting
+|category|node name|input type|output type|desc.|
+| --- | --- | --- | --- | --- |
+|report|Mask Reporting|`MODEL_MASK`|`STRING`|Returns basic layer statistics for the mask|
+|report|Model Reporting|`MODEL`|`STRING`, `IMAGE`|Returns a plot of a model layer|
+
 
 ### Merging
 * In general, one means keep first model, zero means keep second model
