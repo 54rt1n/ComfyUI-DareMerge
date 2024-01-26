@@ -1,13 +1,15 @@
-
-import torch
-
+# ddare/reporting.py
+from io import BytesIO
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
 from PIL import Image
-from io import BytesIO
+import re
+import torch
+from typing import Tuple
 
-def get_figsize(numel : int) -> (int, int):
+PLOT_SCALING = ['mean', 'log', 'max', 'min', 'std', 'none']
+
+def get_figsize(numel : int) -> Tuple[int, int]:
     if numel <= 320:
         width = 40
     elif numel <= 1280:
@@ -32,8 +34,6 @@ def get_figsize(numel : int) -> (int, int):
     height = numel // width
 
     return (width, height)
-
-PLOT_SCALING = ['mean', 'log', 'max', 'min', 'std', 'none']
 
 def plot_model_layer(layer: torch.Tensor, layer_name: str, scaling : str = 'mean', show_legend: bool = True, **kwargs) -> torch.Tensor:
     # Count the number of layers to determine subplot grid size
@@ -80,4 +80,3 @@ def plot_model_layer(layer: torch.Tensor, layer_name: str, scaling : str = 'mean
     # Create and return a PIL image
     img = Image.open(buf)
     return torch.from_numpy(np.array(img)).float() / 255.0
-

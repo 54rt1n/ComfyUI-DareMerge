@@ -1,5 +1,4 @@
 # ddare/mask.py
-
 import torch
 from typing import Dict, Optional
 

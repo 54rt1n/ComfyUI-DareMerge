@@ -1,5 +1,4 @@
 # ddare/tensor.py
-
 import torch
 from typing import Optional, Literal
 
@@ -71,21 +70,60 @@ def dare_ties_sparsification(model_a_param: torch.Tensor, model_b_param: torch.T
     
     return sparsified_flat.view_as(model_a_param)
 
-def relative_norm(weight_a: torch.Tensor, weight_b: torch.Tensor, eps : float = EPSILON) -> float:
+def relative_norm(tensor_a: torch.Tensor, tensor_b: torch.Tensor, eps : float = EPSILON) -> float:
     """
-    Calculate the relative norm of two weight tensors.
+    Calculate the relative norm of two tensor tensors.
 
     Args:
-        weight_a (torch.Tensor): Weight tensor of this instance.
-        weight_b (torch.Tensor): Weight tensor of the other instance.
+        tensor_a (torch.Tensor): tensor tensor of this instance.
+        tensor_b (torch.Tensor): tensor tensor of the other instance.
+        eps (float): Epsilon value to avoid division by zero.
 
     Returns:
         float: Scaling factor.
     """
-    norm_a = torch.norm(weight_a)
-    norm_b = torch.norm(weight_b)
+    norm_a = torch.norm(tensor_a)
+    norm_b = torch.norm(tensor_b)
     return norm_b / (norm_a + eps)  # Adding epsilon to avoid division by zero
 
+def l2_norm(tensor: torch.Tensor, eps : float = EPSILON) -> torch.Tensor:
+    """
+    Calculate the L2 norm of a tensor.
+    
+    Args:
+        tensor (torch.Tensor): The tensor to calculate the L2 norm for.
+        eps (float): Epsilon value to avoid division by zero.
+        
+    Returns:
+        float: The L2 norm of the tensor.
+    """
+    return tensor / (torch.norm(tensor) + eps)
+
+def spectral_norm(matrix: torch.Tensor) -> torch.Tensor:
+    """
+    Calculate the spectral norm of a matrix.
+
+    The spectral norm of a matrix is the largest singular value of the matrix. It's a measure
+    of the matrix's ability to stretch or compress vectors when applied to them.
+
+    Args:
+        matrix (torch.Tensor): A 2D tensor representing the matrix for which the spectral norm
+                               is to be computed. The tensor must have exactly two dimensions.
+
+    Returns:
+        torch.Tensor: A tensor containing a single scalar value, which is the spectral norm
+                      of the input matrix.
+
+    Raises:
+        ValueError: If the input is not a 2D tensor.
+    """
+    if matrix.ndim != 2:
+        raise ValueError("Input must be a 2D tensor.")
+
+    # Compute the spectral norm (2-norm) using torch.linalg.norm
+    norm = torch.linalg.norm(matrix, ord=2)
+
+    return norm
 
 def get_threshold_mask(model_a_param: torch.Tensor, model_b_param: torch.Tensor, device : torch.device, threshold: float, select: str, **kwargs) -> torch.Tensor:
     """

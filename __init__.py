@@ -4,7 +4,7 @@ from .components.dare_mbw import DareUnetMergerMBW
 from .components.block import BlockUnetMerger
 from .components.normalize import NormalizeUnet
 from .components.mask_model import MagnitudeMasker, MaskOperations, MaskEdit, SimpleMasker, QuadMasker
-from .components.reports import MaskReporting, ModelReporting
+from .components.reports import MaskReporting, ModelReporting, LoRAReporting
 
 
 NODE_CLASS_MAPPINGS = {
@@ -19,6 +19,7 @@ NODE_CLASS_MAPPINGS = {
     "DM_MaskEdit": MaskEdit,
     "DM_ModelReporting": ModelReporting,
     "DM_MaskReporting": MaskReporting,
+    "DM_LoRAReporting": LoRAReporting,
     "DM_NormalizeModel": NormalizeUnet,
 }
 
@@ -34,6 +35,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DM_MaskEdit": "Mask Edit",
     "DM_ModelReporting": "Model Reporting",
     "DM_MaskReporting": "Mask Reporting",
+    "DM_LoRAReporting": "LoRA Reporting",
     "DM_NormalizeModel": "Normalize Model",
 }
 

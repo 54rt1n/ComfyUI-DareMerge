@@ -1,11 +1,12 @@
 # ddare/const.py
 
-MASK_CATEGORY="ddare/mask"
-UNET_CATEGORY="ddare/unet"
-CLIP_CATEGORY="ddare/clip"
-UTIL_CATEGORY="ddare/util"
-REPORT_CATEGORY="ddare/report"
+MASK_CATEGORY="DareMerge/mask"
+UNET_CATEGORY="DareMerge/unet"
+LORA_CATEGORY="DareMerge/lora"
+CLIP_CATEGORY="DareMerge/clip"
+UTIL_CATEGORY="DareMerge/util"
+REPORT_CATEGORY="DareMerge/report"
 
 CHUNK_SIZE = 10**7  # Constant chunk size for memory management
 
-EPSILON = 1e-8 # A very small number
+EPSILON = 1e-12 # A very small number

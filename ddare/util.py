@@ -1,8 +1,10 @@
-# merge/util.py
+# ddare/util.py
+from collections import defaultdict
 from comfy.model_patcher import ModelPatcher
 import contextlib
+import re
 import torch
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 
 def patcher(model: ModelPatcher, key : str) -> Optional[torch.Tensor]:
     # This is slow, but seems to work
@@ -66,3 +68,29 @@ def get_patched_state(model : ModelPatcher) -> Dict[str, torch.Tensor]:
         model_sd = model.model_state_dict()
     
     return model_sd
+
+def sort_key_for_zero_padding(s: str, width : int = 2) -> str:
+    """
+    Custom sort key function that uses zero-padding for sorting.
+
+    Args:
+        s (str): The string to be sorted.
+        width (int): The fixed width for zero-padding numbers.
+
+    Returns:
+        str: A zero-padded string for sorting purposes.
+    """
+    return re.sub(r'(\d+)', lambda x: x.group(1).zfill(width), s)
+
+def dumb_json(obj : Any) -> Any:
+    """
+    Serialize an object to JSON.  This is a helper function for json.dumps that can serialize some objects that json.dumps can't.
+    """
+    if isinstance(obj, torch.Tensor):
+        return obj.shape
+    if isinstance(obj, set):
+        return list(obj)
+    if isinstance(obj, defaultdict):
+        return dict(obj)
+    return obj
+
