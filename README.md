@@ -20,6 +20,7 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).
 | --- | --- | --- | --- | --- |
 |mask|Magnitude Masker|`MODEL`, `MODEL`|`MODEL_MASK`|Creates a mask based on the deltas of the parameters|
 |mask|Mask Operations|`MODEL_MASK`, `MODEL_MASK`|`MODEL_MASK`|Allows set operations to be performed on masks|
+|mask|Mask Reporting|`MODEL_MASK`|`STRING`|Returns basic layer statistics for the mask|
 
 ## Utilities
 |category|node name|input type|output type|desc.|
