@@ -1,4 +1,5 @@
 # components/mask_model.py
+from collections import defaultdict
 from comfy.model_patcher import ModelPatcher
 import torch
 from typing import Dict, Tuple
@@ -121,3 +122,76 @@ class MaskOperations:
             return (ModelMask.symmetric_distance(mask_a, mask_b),)
         else:
             raise ValueError("Unknown operation: {}".format(operation))
+
+
+class MaskReporting:
+    """
+    Take two masks and perform a set operation.  union, intersect, difference, xor
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls) -> Dict[str, tuple]:
+        """
+        Defines the input types for the masking process.
+
+        Returns:
+            Dict[str, tuple]: A dictionary specifying the required model types and parameters.
+        """
+        return {
+            "required": {
+                "mask": ("MODEL_MASK",),
+                "report": (["size"], {"default": "size"}),
+            }
+        }
+        
+    RETURN_TYPES = ("STRING",)
+    FUNCTION = "mask_report"
+    CATEGORY = MASK_CATEGORY
+    
+    def mask_report(self, mask: ModelMask, report: str = "size", **kwargs) -> Tuple[str]:
+        """
+        Generate a report on the mask.
+
+        Args:
+            mask (ModelMask): The mask.
+            report (str): The report to generate. 
+
+        Returns:
+            Tuple[str]: A tuple containing the report.
+        """
+        if report == "size":
+            return (self.size_report(mask), )
+        else:
+            raise ValueError("Unknown report: {}".format(report))
+
+    def size_report(self, mask: ModelMask) -> Tuple[str]:
+        """
+        Generate a report on the size of the mask.
+
+        Args:
+            mask (ModelMask): The mask.
+
+        Returns:
+            Tuple[str]: A tuple containing the report.
+        """
+        sd = mask.state_dict
+        data = defaultdict(dict)
+        for k in sd.keys():
+            parts = k.split(".", 2)
+            if len(parts) == 2:
+                print("skipping", k)
+            else:
+                model, block, rest = parts
+                # our report is a tuple containing the number of elements, and the number of elements that are true
+                data[block][rest] = (sd[k].numel(), sd[k].sum().item())
+
+        report = ""
+        for block in data.keys():
+            total = 0
+            total_true = 0
+            for rest in data[block].keys():
+                total += data[block][rest][0]
+                total_true += data[block][rest][1]
+            report += f"{block}: {total_true} / {total} ({total_true / total * 100:.2f}%)\n"
+        
+        return report
