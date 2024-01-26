@@ -18,8 +18,10 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).
 ## Masking
 |category|node name|input type|output type|desc.|
 | --- | --- | --- | --- | --- |
+|mask|Simple Masker|`MODEL`|`MODEL_MASK`|Creates a new mask for a model|
 |mask|Magnitude Masker|`MODEL`, `MODEL`|`MODEL_MASK`|Creates a mask based on the deltas of the parameters|
 |mask|Mask Operations|`MODEL_MASK`, `MODEL_MASK`|`MODEL_MASK`|Allows set operations to be performed on masks|
+|mask|Mask Edit|`MODEL_MASK`|`MODEL_MASK`|Allows the direct editing of mask layers|
 |mask|Mask Reporting|`MODEL_MASK`|`STRING`|Returns basic layer statistics for the mask|
 
 ## Utilities
@@ -55,6 +57,9 @@ DARE-TIES does a stochastic selection of the parameters to keep, and then only p
 
 #### What does this mean?
 I don't know if it means you could potentially bin the parameters of a model up with some fancy set thresholding, and then merge a different model in to each slice...  It might mean that though; and probably does.
+
+### Mask Editing
+Selecting which parameters by magnitude masking may be one approach, but a potentially more powerful approach would be pure random selection; until we can find a pattern in our latent space and account for it, we can assume that the distribution of the parameters for a given state is random.  The mask editor can target individual layers of the mask, and generate a boolean or random (bernoulli or gaussian) mask for that layer.  * is a wildcard and will match all layers.  If you need to find the layer names, you can see them in the mask reporting node 'details' report.
 
 ### Normalization
 I am testing out a new normalization method, which is to normalize the norm of the parameters of one model to another.  This is done by taking the ratio of the norms, and then scaling the parameters of the first model by that ratio.  This is done in the `Normalize Model` node.  There are a few options, of most interest is the 'attn_only' option, which only scales Q and K relative to each other, and just that.  You should see no difference in the model's performance, but it might make the merge more stable.

@@ -14,3 +14,6 @@ Workflows:
 ## Masking
 You can see the basic mask operations below:
 ![image](./maskops.png)
+
+More advanced features are in development if you want to try them out:
+![image](./maskedit.png)

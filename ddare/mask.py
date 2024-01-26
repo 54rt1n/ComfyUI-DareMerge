@@ -3,7 +3,9 @@
 import torch
 from typing import Dict, Optional
 
+from .tensor import bernoulli_noise, gaussian_noise
 
+# This is very memory heavy.  Making true/false or sparse masks would be better; and patterns such as triangle, or right/left, up/down split.
 class ModelMask:
     """ 
     A container to hold a state dict of masks for a model.
@@ -22,6 +24,39 @@ class ModelMask:
     def model_state_dict(self) -> Dict[str, torch.Tensor]:
         return self.state_dict
 
+    def clone(self) -> 'ModelMask':
+        return ModelMask({k: v.clone().to("cpu") for k, v in self.state_dict.items()})
+
+    def noise_layer(self, layer_name : str, noise_type : str, v0 : float, v1 : float, **kwargs):
+        """
+        Takes our current mask and adds noise to it.
+        """
+        layer = self.state_dict[layer_name]
+        if noise_type == "bernoulli":
+            noise = bernoulli_noise(layer, v0)
+        elif noise_type == "gaussian":
+            noise = gaussian_noise(layer, v0, v1)
+        else:
+            raise ValueError(f"Unknown noise type {noise_type}")
+        
+        del self.state_dict[layer_name]
+        
+        self.state_dict[layer_name] = noise.to("cpu")
+
+    def boolean_layer(self, layer_name : str, direction : bool, **kwargs):
+        """
+        Takes our current mask and adds noise to it.
+        """
+        layer = self.state_dict[layer_name]
+        if direction:
+            tensor = torch.ones(layer.shape)
+        else:
+            tensor = torch.zeros(layer.shape)
+        
+        del self.state_dict[layer_name]
+        
+        self.state_dict[layer_name] = tensor.to("cpu")
+        
     @classmethod
     def union(cls, mask_a : 'ModelMask', mask_b : 'ModelMask') -> 'ModelMask':
         """

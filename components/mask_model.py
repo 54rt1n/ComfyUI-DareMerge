@@ -1,12 +1,13 @@
 # components/mask_model.py
 from collections import defaultdict
 from comfy.model_patcher import ModelPatcher
+import re
 import torch
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List, Generator, Optional
 
 from ..ddare.const import MASK_CATEGORY
 from ..ddare.mask import ModelMask
-from ..ddare.tensor import get_threshold_mask
+from ..ddare.tensor import get_threshold_mask, bernoulli_noise, gaussian_noise
 from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
 
 
@@ -140,7 +141,7 @@ class MaskReporting:
         return {
             "required": {
                 "mask": ("MODEL_MASK",),
-                "report": (["size"], {"default": "size"}),
+                "report": (["size", "details"], {"default": "size"}),
             }
         }
         
@@ -161,6 +162,8 @@ class MaskReporting:
         """
         if report == "size":
             return (self.size_report(mask), )
+        if report == "details":
+            return (self.list_layers(mask), )
         else:
             raise ValueError("Unknown report: {}".format(report))
 
@@ -195,3 +198,260 @@ class MaskReporting:
             report += f"{block}: {total_true} / {total} ({total_true / total * 100:.2f}%)\n"
         
         return report
+
+    def list_layers(self, mask : ModelMask) -> Tuple[str]:
+        """
+
+        Args:
+            mask (ModelMask): _description_
+
+        Returns:
+            Tuple[str]: _description_
+        """
+
+        result = ""
+        for k in sorted(mask.state_dict.keys(), key=lambda x: self.sort_key_for_zero_padding(x)):
+            size = mask.state_dict[k].numel()
+            true = mask.state_dict[k].sum().item()
+            result += f"{k}: {true} / {size} ({true / size * 100:.2f}%)\n"
+        return (result,)
+
+    def sort_key_for_zero_padding(self, s: str, width : int = 2) -> str:
+        """
+        Custom sort key function that uses zero-padding for sorting.
+
+        Args:
+            s (str): The string to be sorted.
+            width (int): The fixed width for zero-padding numbers.
+
+        Returns:
+            str: A zero-padded string for sorting purposes.
+        """
+        return re.sub(r'(\d+)', lambda x: x.group(1).zfill(width), s)
+
+
+class MaskEdit:
+    """
+    Takes a mask and edits it.  This is where all the hacks happen.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls) -> Dict[str, tuple]:
+        """
+        Defines the input types for the masking process.
+
+        Returns:
+            Dict[str, tuple]: A dictionary specifying the required model types and parameters.
+        """
+        return {
+            "required": {
+                "mask": ("MODEL_MASK",),
+                "operation": (["random", "gaussian", "true", "false"], {'default': "random"}),
+                "arg_one": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "arg_two": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "seed": ("INT", {"default": 1, "min":0, "max": 99999999999}),
+                # It would be cool if we could autopupulate layer names here from a dropdown
+                "layers": ("STRING", {"multiline": True}),
+            },
+        }
+        
+    RETURN_TYPES = ("MODEL_MASK",)
+    FUNCTION = "mask_command"
+    CATEGORY = MASK_CATEGORY
+    
+    def mask_command(self, mask: ModelMask, operation: str = "random", arg_one: float = 0.0, arg_two: float = 0.0, seed: Optional[int] = None, layers: str = "", **kwargs) -> Tuple[ModelMask]:
+        """
+        Run a command on the mask.
+        
+        Args:
+            mask (ModelMask): The mask.
+            operation (str): The operation to perform.
+            arg_one (float): The first argument.
+            arg_two (float): The second argument.
+            seed (int): The random seed.
+            layers (str): The layer names.  This can be a comma separated list, with wildcards, or using {0, 1} to target specific layers.
+            
+        Returns:
+            Tuple[ModelMask]: A tuple containing the mask.
+        """
+        
+        collected_targets = self.collect_layers(layers, mask)
+        if len(collected_targets) == 0:
+            raise ValueError("No layers specified")
+
+        mask = mask.clone()
+        if seed is not None:
+            torch.manual_seed(seed)
+        for target in collected_targets:
+            for layer in self.layers_for_mask(target, mask):
+                print("Editing", layer, operation)
+                if operation == "random":
+                    mask.noise_layer(layer, "bernoulli", v0=arg_one, v1=arg_two)
+                elif operation == "gaussian":
+                    mask.noise_layer(layer, "gaussian", v0=arg_one, v1=arg_two)
+                elif operation == "true":
+                    mask.boolean_layer(layer, True)
+                elif operation == "false":
+                    mask.boolean_layer(layer, False)
+                else:
+                    raise ValueError("Unknown operation: {}".format(operation))
+            
+        return (mask,)
+
+    def layer_in_mask(self, layer: str, mask: ModelMask) -> bool:
+        """
+        Checks if a layer is in the mask.
+
+        Args:
+            layer (str): The layer name.
+            mask (ModelMask): The mask.
+
+        Returns:
+            bool: True if the layer is in the mask.
+        """
+        for k in self.layers_for_mask(layer, mask):
+            return True
+        return False
+
+    def layers_for_mask(self, layer: str, mask: ModelMask) -> Generator[str, None, None]:
+        """
+        Gets the layers for a mask.
+
+        Args:
+            layer (str): The layer name.
+            mask (ModelMask): The mask.
+
+        Returns:
+            Generator[str, None, None]: A generator containing the layers.
+        """
+        keys = list(mask.state_dict.keys())
+        # If layer doesn't end with a dot, add one
+        if not layer.endswith("."):
+            layer += "."
+        
+        # Match our wildcard
+        if re.search(r"\*", layer):
+            # We need to escape the layer name, and then replace the wildcard with a regex
+            wclayer = re.escape(layer)
+            wclayer = re.sub(r"\\\*", r"(.*)", wclayer)
+            wclayer = re.compile(wclayer)
+        else:
+            wclayer = None
+        
+        for k in keys:
+            #prefix = len("diffusion_model.")
+            prefix = 0
+            key = k[prefix:]
+            if key.startswith(layer) or key.endswith(layer) or key == layer:
+                yield k
+            elif wclayer is not None:
+                match = wclayer.match(key)
+                if match:
+                    yield k
+
+    def collect_layers(self, layers: str, mask: ModelMask) -> List[str]:
+        """
+        Collects the layer names from the input string.
+
+        Args:
+            layers (str): The layer names.
+
+        Returns:
+            Tuple[str]: A tuple containing the layer names.
+        """
+        # We should split by newline and comma, and remove whitespace and empty strings
+        clean = re.sub(r"\s+", "", layers)
+        layers = re.split(r"[\n,]", clean)
+        # if we have any braces, we need to collect the numbers inside and expand them
+        # we do this by matching for braces, and then pulling out the comma separated values inside with regex
+        # TODO recurse this to handle multiple braces in one key
+        
+        bracket = re.compile(r"\{(.*?)\}")
+        results = []
+        for layer in layers:
+            match = bracket.match(layer)
+            if match:
+                matchval = match.group(1)
+                branches = re.sub(r"\s+", "", matchval).split(",")
+                for branch in branches:
+                    new_branch = re.sub(layer, matchval, branch)
+                    if self.layer_in_mask(new_branch, mask):
+                        results.append(new_branch)
+                    else:
+                        print("Branch not found, skipping", new_branch)
+            else:
+                if self.layer_in_mask(layer, mask):
+                    results.append(layer)
+                else:
+                    print("Layer not found, skipping", layer)
+        return results
+
+
+class SimpleMasker:
+    """
+    A managed state dict to allow for masking of model layers.  This is used for protecting
+    layers from being overwritten by the merge process.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls) -> Dict[str, tuple]:
+        """
+        Defines the input types for the masking process.
+
+        Returns:
+            Dict[str, tuple]: A dictionary specifying the required model types and parameters.
+        """
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "operation": (["random", "gaussian", "true", "false"], {'default': "true"}),
+                "arg_one": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "arg_two": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "seed": ("INT", {"default": 1, "min":0, "max": 99999999999}),
+            }
+        }
+
+    RETURN_TYPES = ("MODEL_MASK",)
+    FUNCTION = "mask"
+    CATEGORY = MASK_CATEGORY
+
+    def mask(self, model: ModelPatcher, operation: str = "true", arg_one: float = 0.0, arg_two: float = 0.0, seed: int = 1, **kwargs) -> Tuple[ModelMask]:
+        """
+        Takes a model and creates a mask for it using one of the following methods:
+        - random: Creates a bournoulli mask with the given threshold.
+        - gaussian: Creates a gaussian mask with the given mean and standard deviation.
+        - true: Creates a mask of all true values.
+        - false: Creates a mask of all false values.
+
+        Args:
+            model (ModelPatcher): The model to create a mask for.
+            operation (str): The type of mask to create.
+            arg_one (float): The first argument.  For random, this is the threshold.  For gaussian, this is the mean.
+            arg_two (float): The second argument.  For gaussian, this is the standard deviation.
+            seed (int): The random seed.  Only used for random and gaussian masks.
+
+        Returns:
+            Tuple[ModelPatcher]: A tuple containing the mask.
+        """
+        model_sd = model.model_state_dict()
+
+        mm = ModelMask({})
+
+        # Merge each parameter from model_b into model_a
+        for i, k in enumerate(model_sd.keys()):
+            if seed is not None:
+                torch.manual_seed(seed + i)
+            if operation == "random":
+                mask = bernoulli_noise(model_sd[k], arg_one)
+            elif operation == "gaussian":
+                mask = gaussian_noise(model_sd[k], arg_one, arg_two)
+            elif operation == "true":
+                mask = torch.ones(model_sd[k].shape)
+            elif operation == "false":
+                mask = torch.zeros(model_sd[k].shape)
+            else:
+                raise ValueError("Unknown operation: {}".format(operation))
+
+            mm.add_layer_mask(k, mask)
+
+        return (mm,)

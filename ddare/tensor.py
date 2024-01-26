@@ -154,3 +154,48 @@ def _threshold_in_chunks(tensor: torch.Tensor, threshold: float, threshold_type 
         global_threshold = sorted_thresholds[index]
     
     return global_threshold
+
+def bernoulli_noise(layer : torch.Tensor, threshold : float) -> torch.Tensor:
+    """
+    Create a random mask of the same shape as the given layer.
+
+    Args:
+        layer (torch.Tensor): The layer to create a random mask for.
+        threshold (float): Percentage of the layer to be true.
+
+    Returns:
+        torch.Tensor: A random mask of the same shape as the given layer.
+        """
+    return torch.rand(layer.shape) > threshold
+
+def gaussian_noise(layer : torch.Tensor, mean : float = 0.5, std : float = 0.15):
+    """
+    Create a gaussian noise mask of the same shape as the given layer.
+    
+    Args:
+        layer (torch.Tensor): The layer to create a gaussian noise mask for.
+        mean (float): Mean of the gaussian distribution.
+        std (float): Standard deviation of the gaussian distribution.
+        
+    Returns:
+        torch.Tensor: A gaussian noise mask of the same shape as the given layer.
+    """
+    return torch.normal(mean, std, size=layer.shape) > mean
+
+def divide_tensor_into_sets(tensor : torch.Tensor, n_sets : int):
+    """
+    Randomly divide a tensor into n different sets.
+
+    Args:
+        tensor (torch.Tensor): The tensor to be divided.
+        n_sets (int): The number of sets to divide the tensor into.
+
+    Returns:
+        torch.Tensor: A tensor of the same shape as the input, where each element
+                      indicates the set number (ranging from 0 to n_sets-1) to which
+                      it has been assigned.
+    """
+    # Randomly assign each element to one of the n sets
+    random_set_assignments = torch.randint(0, n_sets, tensor.shape, dtype=torch.int)
+
+    return random_set_assignments
