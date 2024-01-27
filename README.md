@@ -24,6 +24,11 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).
 |mask|Mask Operations|`MODEL_MASK`, `MODEL_MASK`|`MODEL_MASK`|Allows set operations to be performed on masks|
 |mask|Mask Edit|`MODEL_MASK`|`MODEL_MASK`|Allows the direct editing of mask layers|
 
+## LoRA
+|category|node name|input type|output type|desc.|
+| --- | --- | --- | --- | --- |
+|lora|LoRA Loader (Tags)|`MODEL`, `CLIP`|`MODEL`, `CLIP`, `STRING`|Loads a LoRA model, returning the tags from the metadata|
+
 ## Utilities
 |category|node name|input type|output type|desc.|
 | --- | --- | --- | --- | --- |

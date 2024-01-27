@@ -5,6 +5,7 @@ from .components.block import BlockUnetMerger
 from .components.normalize import NormalizeUnet
 from .components.mask_model import MagnitudeMasker, MaskOperations, MaskEdit, SimpleMasker, QuadMasker
 from .components.reports import MaskReporting, ModelReporting, LoRAReporting
+from .components.lora import LoraLoaderTags
 
 
 NODE_CLASS_MAPPINGS = {
@@ -21,6 +22,8 @@ NODE_CLASS_MAPPINGS = {
     "DM_MaskReporting": MaskReporting,
     "DM_LoRAReporting": LoRAReporting,
     "DM_NormalizeModel": NormalizeUnet,
+    "DM_LoRALoaderTags": LoraLoaderTags,
+    
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -37,6 +40,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DM_MaskReporting": "Mask Reporting",
     "DM_LoRAReporting": "LoRA Reporting",
     "DM_NormalizeModel": "Normalize Model",
+    "DM_LoRALoaderTags": "LoRA Loader (Tags)",
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
