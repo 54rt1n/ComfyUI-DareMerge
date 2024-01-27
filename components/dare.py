@@ -111,7 +111,7 @@ class DareUnetMerger:
                     if mask is not None:
                         #print(f"Merging {k} with mask Included: {torch.count_nonzero(mask)}, Excluded: {torch.count_nonzero(~mask)}")
                         sparsified_delta = sparsified_delta.to(dtype=merged_a.dtype)
-                        sparsified_delta = torch.where(mask.to(device), sparsified_delta.float().to(device), merged_a.float().to(device))
+                        sparsified_delta = torch.where(mask.to(device), sparsified_delta.to(device), merged_a.to(device))
 
                     if method == "comfy":
                         merged_a = sparsified_delta
