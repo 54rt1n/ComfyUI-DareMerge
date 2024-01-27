@@ -39,6 +39,7 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).
 | --- | --- | --- | --- | --- |
 |report|Mask Reporting|`MODEL_MASK`|`STRING`|Returns basic layer statistics for the mask|
 |report|Model Reporting|`MODEL`|`STRING`, `IMAGE`|Returns a plot of a model layer|
+|report|LoRA Reporting||`STRING`, `IMAGE`|Returns stats and information about a LoRA|
 
 
 ### Merging
