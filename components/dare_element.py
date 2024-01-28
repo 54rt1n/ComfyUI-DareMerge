@@ -1,7 +1,7 @@
-# components/dare_mbw.py
+# components/dare.py
 from comfy.model_patcher import ModelPatcher
 import torch
-from typing import Dict, Tuple, Optional, Literal
+from typing import Dict, Tuple, Optional
 
 from ..ddare.const import UNET_CATEGORY
 from ..ddare.mask import ModelMask
@@ -10,11 +10,10 @@ from ..ddare.tensor import dare_ties_sparsification
 from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
 
 
-class DareUnetMergerMBW:
+class DareUnetMergerElement:
     """
     A class to merge two diffusion U-Net models using calculated deltas, sparsification,
-    and a weighted consensus method. This is the DARE-TIES method, and allows for fine
-    grained control over the merge ratios for each layer like MBW.
+    and a weighted consensus method. This is the DARE-TIES method.
     
     https://arxiv.org/pdf/2311.03099.pdf
     """
@@ -27,28 +26,30 @@ class DareUnetMergerMBW:
         Returns:
             Dict[str, tuple]: A dictionary specifying the required model types and parameters.
         """
-        arg_dict = {
+        return {
+            "required": {
                 "model_a": ("MODEL",),
                 "model_b": ("MODEL",),
-                "drop_rate": ("FLOAT", {"default": 0.85, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "drop_rate": ("FLOAT", {"default": 0.90, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "ties": (["sum", "count", "off"], {"default": "sum"}),
                 "rescale": (["off", "on"], {"default": "off"}),
                 "seed": ("INT", {"default": 1, "min":0, "max": 99999999999}),
                 "method": (["comfy",] + METHODS, {"default": "comfy"}),
                 "iterations": ("INT", {"default": 1, "min": 1, "max": 100, "step": 1}),
-                "time": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "label": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "shallow layer": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "middle layer": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "deep layer": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "norm": ("BOOLEAN", {"default": True}),
+                "attn": ("BOOLEAN", {"default": True}),
+                "ff.net":("BOOLEAN", {"default": True}),
+                "norm_vol": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "attn_vol": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "ff.net_vol": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+            },
+            "optional": {
+                "model_mask": ("MODEL_MASK",),
+            }
         }
-        argument = ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01})
-        for i in range(12):
-            arg_dict[f"input_blocks.{i}"] = argument
-        for i in range(3):
-            arg_dict[f"middle_block.{i}"] = argument
-        for i in range(12):
-            arg_dict[f"output_blocks.{i}"] = argument
-        arg_dict["out"] = argument
-        opt = {"model_mask": ("MODEL_MASK",)}
-        return {"required": arg_dict ,"optional": opt}
 
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "merge"
@@ -111,6 +112,7 @@ class DareUnetMergerMBW:
                     sparsified_delta = dare_ties_sparsification(merged_a, b, device=device, **kwargs)
                     # If we have a mask, apply it to the delta, replacing true values with our delta
                     if mask is not None:
+                        #print(f"Merging {k} with mask Included: {torch.count_nonzero(mask)}, Excluded: {torch.count_nonzero(~mask)}")
                         sparsified_delta = sparsified_delta.to(dtype=merged_a.dtype)
                         sparsified_delta = torch.where(mask.to(device), sparsified_delta.to(device), merged_a.to(device))
 
@@ -136,19 +138,16 @@ class DareUnetMergerMBW:
         return (m,)
 
     @classmethod
-    def scan_layer(cls, key : str, base : str, n : int, **kwargs):
-        for i in range(n):
-            my_key = f"{base}.{i}"
-            if key.startswith(my_key):
-                if my_key in kwargs:
-                    return kwargs[my_key]
-                else:
-                    print(f"No weight for {my_key}")
-                    return None
-            elif i==(n-1):
-                print(f"Unknown key: {key},i={i}")
-                return None
-        return None
+    def get_layer(cls, key, **kwargs):#XL only
+        for i in ["input_blocks.0","input_blocks.1","input_blocks.2","output_blocks.6","output_blocks.7","output_blocks.8"]:
+            if i in key:
+                return kwargs["kwargs"]["shallow layer"]
+        for i in ["input_blocks.3","input_blocks.4","input_blocks.5","output_blocks.3","output_blocks.4","output_blocks.5"]:
+            if i in key:
+                return kwargs["kwargs"]["middle layer"]
+        for i in ["input_blocks.6","input_blocks.7","input_blocks.8","middle_block","output_blocks.0","output_blocks.1","output_blocks.2"]:
+            if i in key:
+                return kwargs["kwargs"]["deep layer"]
 
     @classmethod
     def calculate_layer_ratio(cls, key, **kwargs) -> Optional[float]:
@@ -156,20 +155,13 @@ class DareUnetMergerMBW:
         ratio = None
 
         # Get our ratio for this layer
-        if k_unet.startswith(f"input_blocks."):
-            # use scan layer static
-            ratio = cls.scan_layer(k_unet, "input_blocks", 12, **kwargs)
-        elif k_unet.startswith(f"middle_block."):
-            ratio = cls.scan_layer(k_unet, "middle_block", 3, **kwargs)
-        elif k_unet.startswith(f"output_blocks."):
-            ratio = cls.scan_layer(k_unet, "output_blocks", 12, **kwargs)
-        elif k_unet.startswith("out."):
-            ratio = kwargs.get("out", None)
-        elif k_unet.startswith("time"):
-            ratio = kwargs.get("time", None)
-        elif k_unet.startswith("label_emb"):
-            ratio  = kwargs.get("label", None)
-        else:
-            print(f"Unknown key: {key}, skipping.")
+        if "norm" in k_unet and kwargs["norm"]:
+            ratio = kwargs["norm_vol"]*cls.get_layer(k_unet,kwargs=kwargs)
+        elif "attn" in k_unet and kwargs["attn"]:
+            ratio = kwargs["attn_vol"]*cls.get_layer(k_unet,kwargs=kwargs)
+        elif "ff.net" in k_unet and kwargs["ff.net"]:
+            ratio = kwargs["ff.net_vol"]*cls.get_layer(k_unet,kwargs=kwargs)
+        #else:
+            #print(f"Unknown key: {key}, skipping.") #A large amount is output
 
         return ratio
