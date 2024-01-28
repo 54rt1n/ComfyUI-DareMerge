@@ -1,6 +1,7 @@
 from .components.clip import DareClipMerger
 from .components.dare import DareUnetMerger
 from .components.dare_mbw import DareUnetMergerMBW
+from .components.dare_element import DareUnetMergerElement
 from .components.block import BlockUnetMerger
 from .components.normalize import NormalizeUnet
 from .components.mask_model import MagnitudeMasker, MaskOperations, MaskEdit, SimpleMasker, QuadMasker
@@ -8,10 +9,12 @@ from .components.reports import MaskReporting, ModelReporting, LoRAReporting
 from .components.lora import LoraLoaderTags
 
 
+
 NODE_CLASS_MAPPINGS = {
     "DM_MaskedModelMerger": BlockUnetMerger,
     "DM_DareModelMerger": DareUnetMerger,
     "DM_DareModelMergerMBW": DareUnetMergerMBW,
+    "DM_DareModelMergerElement": DareUnetMergerElement,
     "DM_DareClipMerger": DareClipMerger,
     "DM_SimpleMasker": SimpleMasker,
     "DM_MagnitudeMasker": MagnitudeMasker,
@@ -30,6 +33,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DM_MaskedModelMerger": "Model Merger (Masked)",
     "DM_DareModelMerger": "Model Merger (DARE)",
     "DM_DareModelMergerMBW": "MBW Merger (DARE)",
+    "DM_DareModelMergerElement": "Element Merger (DARE)",
     "DM_DareClipMerger": "CLIP Merger (DARE)",
     "DM_SimpleMasker": "Simple Masker",
     "DM_MagnitudeMasker": "Magnitude Masker",
