@@ -32,7 +32,7 @@ class ModelNoiseInjector:
                 "std": ("FLOAT", {"default": 0.01, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "seed": ("INT", {"default": 1, "min":0, "max": 99999999999}),
                 # It would be cool if we could autopupulate layer names here from a dropdown
-                "layers": ("STRING", {"multiline": True}),
+                "layers": ("STRING", {"multiline": True, "default": "*.to_v*"}),
                 "method": (["comfy",] + METHODS, {"default": "comfy"}),
             },
             "optional": {
