@@ -27,7 +27,7 @@ class ModelNoiseInjector:
             "required": {
                 "model": ('MODEL',),
                 "operation": (["random", "gaussian"], {'default': "gaussian"}),
-                "ratio": ("FLOAT", {"default": 0.1, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "ratio": ("FLOAT", {"default": 0.98, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "mean": ("FLOAT", {"default": 0.05, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "std": ("FLOAT", {"default": 0.01, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "seed": ("INT", {"default": 1, "min":0, "max": 99999999999}),
