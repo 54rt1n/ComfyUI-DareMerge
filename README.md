@@ -34,7 +34,7 @@ Gradients control the merge ratios for layers.
 * Can accept a model mask, which will restrict changes to only modify the masked areas.
 
 ## Masking
-These are masks that whitelist or blacklist parameters for a merge.  They are used to filter out parameters that are not wanted in a merge, and can be used to protect or target the parameters of a model for changes.
+These are masks that whitelist or blacklist parameters for a merge.  They are used to filter parameters that are wanted in a merge, and can be used to protect or target the parameters of a model for changes.
 |category|node name|input type|output type|desc.|
 | --- | --- | --- | --- | --- |
 |mask|Simple Masker|`MODEL`|`MODEL_MASK`|Creates a new mask for a model|
