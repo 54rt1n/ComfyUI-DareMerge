@@ -98,3 +98,9 @@ Selecting which parameters by magnitude masking may be one approach, but a poten
 
 ### Normalization
 I am testing out a new normalization method, which is to normalize the norm of the parameters of one model to another.  This is done by taking the ratio of the norms, and then scaling the parameters of the first model by that ratio.  This is done in the `Normalize Model` node.  There are a few options, of most interest is the 'attn_only' option, which only scales Q and K relative to each other, and just that.  You should see no difference in the model's performance, but it might make the merge more stable.
+
+### Noise Injection
+Noise injection is a really fun tool that you can use to inject noise into targeted layers (or parts of layers, using a model mask), in a manner similar to https://github.com/EGjoni/DRUGS.
+
+### LoRA Loader (Tags)
+This node will load a LoRA model, and return the tags from the metadata as a comma separated string, ready to pass to some other node.
