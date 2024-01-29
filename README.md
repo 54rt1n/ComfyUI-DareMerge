@@ -1,7 +1,7 @@
 # ComfyUI-DareMerge
 Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).  Now with CLIP support and a bunch of other stuff.
 
-Check out Noise Injection for a fun time.
+Check out Noise Injection for a fun time, and the LoRA loader that can read the tags.
 
 # Node List
 
