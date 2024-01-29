@@ -1,6 +1,7 @@
 # Examples
 
 Some of the images in this directory have embedded workflows:
+*these are outdated and will be updated soon*
 Workflows:
 
 * `daremerge.png` - The above DARE merge workflow

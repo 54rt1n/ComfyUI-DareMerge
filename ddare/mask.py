@@ -18,7 +18,7 @@ class ModelMask:
     def get_layer_mask(self, layer_name : str) -> Optional[torch.Tensor]:
         if layer_name not in self.state_dict:
             return None
-        return self.state_dict[layer_name]
+        return self.state_dict[layer_name].bool()
 
     def model_state_dict(self) -> Dict[str, torch.Tensor]:
         return self.state_dict

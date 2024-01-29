@@ -68,7 +68,7 @@ def dare_ties_sparsification(model_a_param: torch.Tensor, model_b_param: torch.T
     sparsified_flat = torch.where(dare_mask, model_a_flat + delta_flat, model_a_flat)
     del delta_flat, model_a_flat, model_b_flat, dare_mask
     
-    return sparsified_flat.view_as(model_a_param)
+    return sparsified_flat.view_as(model_a_param).to(dtype=model_a_param.dtype)
 
 def relative_norm(tensor_a: torch.Tensor, tensor_b: torch.Tensor, eps : float = EPSILON) -> float:
     """

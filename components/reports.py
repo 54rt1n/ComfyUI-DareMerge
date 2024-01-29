@@ -6,7 +6,7 @@ import folder_paths
 import json
 from typing import Dict, Tuple
 
-from ..ddare.const import REPORT_CATEGORY
+from ..ddare.const import REPORT_CATEGORY, LAYER_GRADIENT, MODEL_MASK
 from ..ddare.lora import DoctorLora
 from ..ddare.mask import ModelMask
 from ..ddare.reporting import plot_model_layer, PLOT_SCALING
@@ -28,7 +28,7 @@ class MaskReporting:
         """
         return {
             "required": {
-                "mask": ("MODEL_MASK",),
+                "mask": (MODEL_MASK,),
                 "report": (["size", "details"], {"default": "size"}),
             }
         }
@@ -220,3 +220,76 @@ class LoRAReporting:
         else:
             raise ValueError("Unknown report: {}".format(report))
 
+
+class LayerGradientReporting:
+    """
+    Generate some reports on a gradient
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls) -> Dict[str, tuple]:
+        """
+        Defines the input types for the masking process.
+
+        Returns:
+            Dict[str, tuple]: A dictionary specifying the required model types and parameters.
+        """
+        return {
+            "required": {
+                "gradient": (LAYER_GRADIENT,),
+                "report": (["size", "details"], {"default": "size"}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING","IMAGE",)
+    FUNCTION = "gradient_report"
+    CATEGORY = REPORT_CATEGORY
+
+    def gradient_report(self, gradient : Dict[str, float], report: str = "size", **kwargs) -> Tuple[str]:
+        """
+        Generate a report on the gradient.
+
+        Args:
+            gradient (Dict[str, float]): The gradient.
+            report (str): The report to generate. 
+
+        Returns:
+            Tuple[str]: A tuple containing the report.
+        """
+        if report == "size":
+            return (self.size_report(gradient), )
+        if report == "details":
+            return (self.list_layers(gradient), )
+        else:
+            raise ValueError("Unknown report: {}".format(report))
+
+    def size_report(self, gradient : Dict[str, float]) -> Tuple[str]:
+        """
+        Generate a report on the size of the gradient.
+
+        Args:
+            gradient (Dict[str, float]): The gradient.
+
+        Returns:
+            Tuple[str]: A tuple containing the report.
+        """
+        report = ""
+        for k in sorted(gradient.keys(), key=lambda x: sort_key_for_zero_padding(x)):
+            report += f"{k}: {gradient[k]:.2f}\n"
+        
+        return report
+
+    def list_layers(self, gradient : Dict[str, float]) -> Tuple[str]:
+        """
+
+        Args:
+            gradient (Dict[str, float]): _description_
+
+        Returns:
+            Tuple[str]: _description_
+        """
+
+        result = ""
+        for k in sorted(gradient.keys(), key=lambda x: sort_key_for_zero_padding(x)):
+            result += f"{k}: {gradient[k]:.2f}\n"
+        return (result,)

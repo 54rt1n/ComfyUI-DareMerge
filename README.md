@@ -6,14 +6,23 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).
 ## U-Net
 |category|node name|input type|output type|desc.|
 | --- | --- | --- | --- | --- |
-|unet|Model Merger (Masked)|`MODEL`, `MODEL`, `MODEL_MASK`|`MODEL`|Performs a masked block merge|
-|unet|Model Merger (DARE)|`MODEL`, `MODEL`, `MODEL_MASK (optional)`|`MODEL`|Performs a DARE block merge|
-|unet|MBW Merger (DARE)|`MODEL`, `MODEL`, `MODEL_MASK (optional)`|`MODEL`|Performs a DARE block merge, with full layer control (like MBW)|
+|unet|Model Merger (Advanced)|`MODEL`, `MODEL`, `LAYER_GRADIENT`, `MODEL_MASK (optional)`|`MODEL`|Performs a model merge, with gradient configuration for layer weights|
+|unet|Model Merger (Advanced/DARE)|`MODEL`, `MODEL`, `LAYER_GRADIENT`, `MODEL_MASK (optional)`|`MODEL`|Performs a DARE-TIES merge (using layers is for targeted control)|
+| --- | --- | --- | --- | --- |
+|unet|Model Merger (Block)|`MODEL`, `MODEL`, `MODEL_MASK (optional)`|`MODEL`|Performs a block merge|
+|unet|Model Merger (Block/DARE)|`MODEL`, `MODEL`, `MODEL_MASK (optional)`|`MODEL`|Performs a DARE block merge|
+|unet|Model Merger (MBW/DARE)|`MODEL`, `MODEL`, `MODEL_MASK (optional)`|`MODEL`|Performs a DARE block merge (using MBW)|
+|unet|Model Merger (Attention/DARE)|`MODEL`, `MODEL`, `MODEL_MASK (optional)`|`MODEL`|Performs a DARE block merge (targeting attention)|
 
-## CLIP
+## Layer Gradient
 |category|node name|input type|output type|desc.|
 | --- | --- | --- | --- | --- |
-|clip|CLIP Merger (DARE)|`CLIP`, `CLIP`|`CLIP`|Performs a DARE merge on two CLIP|
+|grad|Gradient Operations|`LAYER_GRADIENT`, `LAYER_GRADIENT`|`LAYER_GRADIENT`|Performs operations on layer gradients|
+|grad|Gradient Edit|`LAYER_GRADIENT`|`LAYER_GRADIENT`|Directly target layers for editing with wildcards|
+|grad|Block Gradient|`MODEL`|`LAYER_GRADIENT`|Returns the block gradient for a model|
+|grad|Attention Gradient|`MODEL`|`LAYER_GRADIENT`|Returns the attention gradient for a model|
+|grad|Shell Gradient|`MODEL`|`LAYER_GRADIENT`|Returns the balanced layers (onion) gradient for a model|
+|grad|MBW Gradient|`MODEL`|`LAYER_GRADIENT`|Returns the MBW-style gradient for a model|
 
 ## Masking
 |category|node name|input type|output type|desc.|
@@ -23,6 +32,11 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).
 |mask|Quad Masker|`MODEL`|`MODEL_MASK`, `MODEL_MASK`, `MODEL_MASK`, `MODEL_MASK`|Creates four random non-overlapping masks|
 |mask|Mask Operations|`MODEL_MASK`, `MODEL_MASK`|`MODEL_MASK`|Allows set operations to be performed on masks|
 |mask|Mask Edit|`MODEL_MASK`|`MODEL_MASK`|Allows the direct editing of mask layers|
+
+## CLIP
+|category|node name|input type|output type|desc.|
+| --- | --- | --- | --- | --- |
+|clip|CLIP Merger (DARE)|`CLIP`, `CLIP`|`CLIP`|Performs a DARE merge on two CLIP|
 
 ## LoRA
 |category|node name|input type|output type|desc.|
@@ -37,9 +51,10 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).
 ## Reporting
 |category|node name|input type|output type|desc.|
 | --- | --- | --- | --- | --- |
-|report|Mask Reporting|`MODEL_MASK`|`STRING`|Returns basic layer statistics for the mask|
+|report|Mask Reporting|`MODEL_MASK`|`STRING`, `IMAGE`|Returns basic layer statistics for the mask|
 |report|Model Reporting|`MODEL`|`STRING`, `IMAGE`|Returns a plot of a model layer|
 |report|LoRA Reporting||`STRING`, `IMAGE`|Returns stats and information about a LoRA|
+|report|Gradient Reporting|`LAYER_GRADIENT`|`STRING`, `IMAGE`|Returns a report on the layer gradient|
 
 
 ### Merging
@@ -54,6 +69,9 @@ DARE-TIES does a stochastic selection of the parameters to keep, and then only p
 * Take model B, and merge it in to model A using the mask to protect model A's largest parameters.
 
 *Of note, this merge method does use random sampling, so you should not just assume that your first random seed is the best one for your merge, and if it is not set to fixed that the merge will change every run.*
+
+### Layer Gradients
+Layer gradients are a generalized term to describe the merge ratios for a model merge.  These define the ratios at each layer of a model, which allows model ratio selection to become a more fine-grained operation which operations can be performed on.  I have left some basic components which do not use LAYER_GRADIENT, but there is nothing special about them as internally they are just using the advanced components.
 
 ### Masks
 * A mask creates a signature of a model to filter parts of a model merge.  Areas that are selected in the mask will be included in the merge, while areas that are not selected will be excluded.

@@ -4,7 +4,7 @@ from comfy.model_patcher import ModelPatcher
 import contextlib
 import re
 import torch
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 def patcher(model: ModelPatcher, key : str) -> Optional[torch.Tensor]:
     # This is slow, but seems to work
@@ -94,3 +94,31 @@ def dumb_json(obj : Any) -> Any:
         return dict(obj)
     return obj
 
+def sniff_model_type(sd : Dict[str, torch.Tensor]) -> str:
+    """
+    Examine a model's state dict and determine what type of model it is.
+    
+    Args:
+        sd (Dict[str, torch.Tensor]): The model's state dict.
+        
+    Returns:
+        str: The model type.
+    """
+    # TODO sd21 support
+    if "diffusion_model.output_blocks.11.0.in_layers.0.weight" in sd:
+        return "sd15"
+    else:
+        return "sdxl"
+
+def merge_input_types(*classes : List[Dict[str, tuple]]) -> Dict[str, tuple]:
+    """
+    Takes the INPUT_TYPES from two nodes and merges them into a single dictionary.
+    """
+    required = {}
+    optional = {}
+    for c in classes:
+        required_a = c.get("required", {})
+        required = {**required_a, **required}
+        optional_a = c.get("optional", {})
+        optional = {**optional_a, **optional}
+    return {"required": required, "optional": optional}

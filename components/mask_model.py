@@ -4,7 +4,7 @@ import re
 import torch
 from typing import Dict, Tuple, List, Generator, Optional
 
-from ..ddare.const import MASK_CATEGORY
+from ..ddare.const import MASK_CATEGORY, MODEL_MASK
 from ..ddare.mask import ModelMask
 from ..ddare.tensor import get_threshold_mask, bernoulli_noise, gaussian_noise, divide_tensor_into_sets
 from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
@@ -34,7 +34,7 @@ class MagnitudeMasker:
             }
         }
 
-    RETURN_TYPES = ("MODEL_MASK",)
+    RETURN_TYPES = (MODEL_MASK,)
     FUNCTION = "mask"
     CATEGORY = MASK_CATEGORY
 
@@ -90,13 +90,13 @@ class MaskOperations:
         """
         return {
             "required": {
-                "mask_a": ("MODEL_MASK",),
-                "mask_b": ("MODEL_MASK",),
+                "mask_a": (MODEL_MASK,),
+                "mask_b": (MODEL_MASK,),
                 "operation": (["union", "intersect", "difference", "xor"], {"default": "union"}),
             }
         }
         
-    RETURN_TYPES = ("MODEL_MASK",)
+    RETURN_TYPES = (MODEL_MASK,)
     FUNCTION = "mask_ops"
     CATEGORY = MASK_CATEGORY
     
@@ -139,7 +139,7 @@ class MaskEdit:
         """
         return {
             "required": {
-                "mask": ("MODEL_MASK",),
+                "mask": (MODEL_MASK,),
                 "operation": (["random", "gaussian", "true", "false"], {'default': "random"}),
                 "arg_one": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "arg_two": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
@@ -149,7 +149,7 @@ class MaskEdit:
             },
         }
         
-    RETURN_TYPES = ("MODEL_MASK",)
+    RETURN_TYPES = (MODEL_MASK,)
     FUNCTION = "mask_command"
     CATEGORY = MASK_CATEGORY
     
@@ -305,7 +305,7 @@ class SimpleMasker:
             }
         }
 
-    RETURN_TYPES = ("MODEL_MASK",)
+    RETURN_TYPES = (MODEL_MASK,)
     FUNCTION = "mask"
     CATEGORY = MASK_CATEGORY
 
@@ -373,7 +373,7 @@ class QuadMasker:
             }
         }
 
-    RETURN_TYPES = ("MODEL_MASK","MODEL_MASK","MODEL_MASK","MODEL_MASK",)
+    RETURN_TYPES = (MODEL_MASK, MODEL_MASK, MODEL_MASK, MODEL_MASK,)
     FUNCTION = "mask"
     CATEGORY = MASK_CATEGORY
 
