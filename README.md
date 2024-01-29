@@ -1,5 +1,7 @@
 # ComfyUI-DareMerge
-Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).  Now with CLIP support.
+Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).  Now with CLIP support and a bunch of other stuff.
+
+Check out Noise Injection for a fun time.
 
 # Node List
 
@@ -15,6 +17,7 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).
 |unet|Model Merger (Attention/DARE)|`MODEL`, `MODEL`, `MODEL_MASK (optional)`|`MODEL`|Performs a DARE block merge (targeting attention)|
 
 ## Layer Gradient
+Gradients control the merge ratios for layers.
 |category|node name|input type|output type|desc.|
 | --- | --- | --- | --- | --- |
 |grad|Gradient Operations|`LAYER_GRADIENT`, `LAYER_GRADIENT`|`LAYER_GRADIENT`|Performs operations on layer gradients|
@@ -24,7 +27,14 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).
 |grad|Shell Gradient|`MODEL`|`LAYER_GRADIENT`|Returns the balanced layers (onion) gradient for a model|
 |grad|MBW Gradient|`MODEL`|`LAYER_GRADIENT`|Returns the MBW-style gradient for a model|
 
+### Merging
+* In general, one means keep first model, zero means keep second model
+* For DARE, we use the base model to determine which values to protect or include.
+* For TIES, we can use the sum of the delta ties (as in the paper), or the count, or off to disable.
+* Can accept a model mask, which will restrict changes to only modify the masked areas.
+
 ## Masking
+These are masks that whitelist or blacklist parameters for a merge.  They are used to filter out parameters that are not wanted in a merge, and can be used to protect or target the parameters of a model for changes.
 |category|node name|input type|output type|desc.|
 | --- | --- | --- | --- | --- |
 |mask|Simple Masker|`MODEL`|`MODEL_MASK`|Creates a new mask for a model|
@@ -47,6 +57,7 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).
 |category|node name|input type|output type|desc.|
 | --- | --- | --- | --- | --- |
 |util|Normalize Model|`MODEL`, `MODEL`|`MODEL`|Normalizes one models parameter norm to another model|
+|util|Inject Noise|`MODEL`|`MODEL`|Injects noise in to a model|
 
 ## Reporting
 |category|node name|input type|output type|desc.|
@@ -55,13 +66,6 @@ Merge two checkpoint models by dare ties (https://github.com/yule-BUAA/MergeLM).
 |report|Model Reporting|`MODEL`|`STRING`, `IMAGE`|Returns a plot of a model layer|
 |report|LoRA Reporting||`STRING`, `IMAGE`|Returns stats and information about a LoRA|
 |report|Gradient Reporting|`LAYER_GRADIENT`|`STRING`, `IMAGE`|Returns a report on the layer gradient|
-
-
-### Merging
-* In general, one means keep first model, zero means keep second model
-* For DARE, we use the base model to determine which values to protect or include.
-* For TIES, we can use the sum of the delta ties (as in the paper), or the count, or off to disable.
-* Can accept a model mask, which will restrict changes to only modify the masked areas.
 
 ## How to use
 DARE-TIES does a stochastic selection of the parameters to keep, and then only performs updates in either the 'up' or 'down' direction.  According to the paper, the workflow should be as such:

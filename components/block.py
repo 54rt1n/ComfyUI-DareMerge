@@ -153,3 +153,4 @@ class BlockUnetMerger:
 
         gradient = BlockLayerGradient().gradient(model=model_a, **kwargs)[0]
         return GradientUnetMerger().merge(model_a=model_a, gradient=gradient, **kwargs)
+

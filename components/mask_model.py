@@ -1,11 +1,11 @@
 # components/mask_model.py
 from comfy.model_patcher import ModelPatcher
-import re
 import torch
-from typing import Dict, Tuple, List, Generator, Optional
+from typing import Dict, Tuple, Optional
 
 from ..ddare.const import MASK_CATEGORY, MODEL_MASK
 from ..ddare.mask import ModelMask
+from ..ddare.model import layers_for_mask, collect_layers
 from ..ddare.tensor import get_threshold_mask, bernoulli_noise, gaussian_noise, divide_tensor_into_sets
 from ..ddare.util import cuda_memory_profiler, get_device, get_patched_state
 
@@ -169,7 +169,8 @@ class MaskEdit:
             Tuple[ModelMask]: A tuple containing the mask.
         """
         
-        collected_targets = self.collect_layers(layers, mask)
+        keys = list(mask.state_dict.keys())
+        collected_targets = collect_layers(layers, keys)
         if len(collected_targets) == 0:
             raise ValueError("No layers specified")
 
@@ -177,7 +178,7 @@ class MaskEdit:
         if seed is not None:
             torch.manual_seed(seed)
         for target in collected_targets:
-            for layer in self.layers_for_mask(target, mask):
+            for layer in layers_for_mask(target, keys):
                 print("Editing", layer, operation)
                 if operation == "random":
                     mask.noise_layer(layer, "bernoulli", v0=arg_one, v1=arg_two)
@@ -191,94 +192,6 @@ class MaskEdit:
                     raise ValueError("Unknown operation: {}".format(operation))
             
         return (mask,)
-
-    def layer_in_mask(self, layer: str, mask: ModelMask) -> bool:
-        """
-        Checks if a layer is in the mask.
-
-        Args:
-            layer (str): The layer name.
-            mask (ModelMask): The mask.
-
-        Returns:
-            bool: True if the layer is in the mask.
-        """
-        for k in self.layers_for_mask(layer, mask):
-            return True
-        return False
-
-    def layers_for_mask(self, layer: str, mask: ModelMask) -> Generator[str, None, None]:
-        """
-        Gets the layers for a mask.
-
-        Args:
-            layer (str): The layer name.
-            mask (ModelMask): The mask.
-
-        Returns:
-            Generator[str, None, None]: A generator containing the layers.
-        """
-        keys = list(mask.state_dict.keys())
-        # If layer doesn't end with a dot, add one
-        if not layer.endswith("."):
-            layer += "."
-        
-        # Match our wildcard
-        if re.search(r"\*", layer):
-            # We need to escape the layer name, and then replace the wildcard with a regex
-            wclayer = re.escape(layer)
-            wclayer = re.sub(r"\\\*", r"(.*)", wclayer)
-            wclayer = re.compile(wclayer)
-        else:
-            wclayer = None
-        
-        for k in keys:
-            #prefix = len("diffusion_model.")
-            prefix = 0
-            key = k[prefix:]
-            if key.startswith(layer) or key.endswith(layer) or key == layer:
-                yield k
-            elif wclayer is not None:
-                match = wclayer.match(key)
-                if match:
-                    yield k
-
-    def collect_layers(self, layers: str, mask: ModelMask) -> List[str]:
-        """
-        Collects the layer names from the input string.
-
-        Args:
-            layers (str): The layer names.
-
-        Returns:
-            Tuple[str]: A tuple containing the layer names.
-        """
-        # We should split by newline and comma, and remove whitespace and empty strings
-        clean = re.sub(r"\s+", "", layers)
-        layers = re.split(r"[\n,]", clean)
-        # if we have any braces, we need to collect the numbers inside and expand them
-        # we do this by matching for braces, and then pulling out the comma separated values inside with regex
-        # TODO recurse this to handle multiple braces in one key
-        
-        bracket = re.compile(r"\{(.*?)\}")
-        results = []
-        for layer in layers:
-            match = bracket.match(layer)
-            if match:
-                matchval = match.group(1)
-                branches = re.sub(r"\s+", "", matchval).split(",")
-                for branch in branches:
-                    new_branch = re.sub(layer, matchval, branch)
-                    if self.layer_in_mask(new_branch, mask):
-                        results.append(new_branch)
-                    else:
-                        print("Branch not found, skipping", new_branch)
-            else:
-                if self.layer_in_mask(layer, mask):
-                    results.append(layer)
-                else:
-                    print("Layer not found, skipping", layer)
-        return results
 
 
 class SimpleMasker:

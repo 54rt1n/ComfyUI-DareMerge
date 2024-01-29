@@ -8,6 +8,7 @@ from .components.normalize import NormalizeUnet
 from .components.mask_model import MagnitudeMasker, MaskOperations, MaskEdit, SimpleMasker, QuadMasker
 from .components.reports import MaskReporting, ModelReporting, LoRAReporting, LayerGradientReporting
 from .components.lora import LoraLoaderTags
+from .components.model import ModelNoiseInjector
 
 
 NODE_CLASS_MAPPINGS = {
@@ -34,6 +35,7 @@ NODE_CLASS_MAPPINGS = {
     "DM_LoRAReporting": LoRAReporting,
     "DM_GradientReporting": LayerGradientReporting,
     "DM_NormalizeModel": NormalizeUnet,
+    "DM_InjectNoise": ModelNoiseInjector,
     "DM_LoRALoaderTags": LoraLoaderTags,
 }
 
@@ -61,6 +63,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "DM_LoRAReporting": "LoRA Reporting",
     "DM_GradientReporting": "Gradient Reporting",
     "DM_NormalizeModel": "Normalize Model",
+    "DM_InjectNoise": "Inject Noise",
     "DM_LoRALoaderTags": "LoRA Loader (Tags)",
 }
 
