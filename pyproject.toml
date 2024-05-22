@@ -1,0 +1,15 @@
+[project]
+name = "comfyui-daremerge"
+description = "Merge two checkpoint models by dare ties [a/(https://github.com/yule-BUAA/MergeLM)](https://github.com/yule-BUAA/MergeLM), sort of."
+version = "1.0.0"
+license = "LICENSE"
+dependencies = ["matplotlib"]
+
+[project.urls]
+Repository = "https://github.com/54rt1n/ComfyUI-DareMerge"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-DareMerge"
+Icon = ""
