@@ -1,15 +1,22 @@
 [project]
 name = "comfyui-daremerge"
-description = "Merge two checkpoint models by dare ties [a/(https://github.com/yule-BUAA/MergeLM)](https://github.com/yule-BUAA/MergeLM), sort of."
-version = "1.0.0"
-license = "LICENSE"
-dependencies = ["matplotlib"]
+description = "ComfyUI powertools for SD1.5 and SDXL model merging"
+version = "0.3.1"
+license = "GPL-3.0-only"
+authors = [
+    { name = "54rt1n", email = "opensource@bmds.us" }
+]
+dependencies = [
+    "pillow",
+    "numpy",
+    "matplotlib",
+    "torch"
+]
 
 [project.urls]
 Repository = "https://github.com/54rt1n/ComfyUI-DareMerge"
-#  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "user"
 DisplayName = "ComfyUI-DareMerge"
-Icon = ""
+Icon = "https://raw.githubusercontent.com/54rt1n/ComfyUI-DareMerge/master/resources/blackhole192.png"
