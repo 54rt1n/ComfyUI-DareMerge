@@ -54,7 +54,7 @@ def dare_ties_sparsification(model_a_param: torch.Tensor, model_b_param: torch.T
     model_b_flat = model_b_param.view(-1).float().to(device)
     delta_flat = model_b_flat - model_a_flat
 
-    dare_mask = torch.bernoulli(torch.full(delta_flat.shape, 1 - drop_rate, device=device)).bool()
+    dare_mask = torch.bernoulli(torch.full(delta_flat.shape, 1.0 - drop_rate, device=device)).bool()
     # The paper says we should rescale, but it yields terrible results for SD.
     if rescale == "on":
         # Rescale the remaining deltas
