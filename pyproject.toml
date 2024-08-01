@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-daremerge"
 description = "ComfyUI powertools for SD1.5 and SDXL model merging"
-version = "0.3.1"
+version = "0.3.2"
 license = { text = "GNU General Public License v3.0" }
 authors = [
     { name = "54rt1n", email = "opensource@bmds.us" }
